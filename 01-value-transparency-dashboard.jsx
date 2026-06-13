@@ -1,0 +1,550 @@
+import { useState, useEffect } from "react";
+// ─── Design tokens — matched to real HelloFresh app ───────────────────────
+const C = {
+  green:      "#1E5C2E",   // dark forest green — header, primary accents
+  greenMid:   "#3E8A50",   // medium green — hover, secondary
+  lime:       "#8DC63F",   // lime green — active nav pill, NEW badge
+  limeSoft:   "#C8E89A",   // soft lime — shimmer highlight
+  bg:         "#F4EFE8",   // warm cream — app background
+  card:       "#EDE8DF",   // slightly richer cream — card backgrounds
+  white:      "#FFFFFF",
+  black:      "#1A1A1A",   // near-black — headings, primary buttons
+  gray:       "#726E68",   // medium gray — secondary text
+  grayLight:  "#B8B2A8",   // light gray — inactive nav labels, chevrons
+  amber:      "#A06A0A",
+  amberBg:    "#FEF3E2",
+  glow:       "rgba(30,92,46,0.45)",
+};
+// ─── Data ────────────────────────────────────────────────────────────────
+const MONTHS = [
+  { label: "Sep", meals: 11, hours: 7.5, recipes: 3, waste: 0.7, value: 176 },
+  { label: "Oct", meals: 14, hours: 9.0, recipes: 5, waste: 0.9, value: 224 },
+  { label: "Nov", meals: 12, hours: 8.0, recipes: 5, waste: 0.8, value: 192 },
+];
+const RECIPES = [
+  { name: "Honey Garlic Salmon",      time: "35 min", cal: "720 kcal", color: "#C4785A" },
+  { name: "Thai Basil Chicken",       time: "30 min", cal: "640 kcal", color: "#B06840" },
+  { name: "Mushroom & Herb Risotto",  time: "40 min", cal: "580 kcal", color: "#7A9A72" },
+];
+const NAV       = ["Plans", "Discover", "Cookbook", "Grocery", "Profile"];
+const NAV_ICONS = ["📋",    "🔍",       "📖",       "🛒",      "👤"    ];
+// ─── CSS animations ───────────────────────────────────────────────────────
+const STYLES = `
+  @keyframes bannerSlideIn  { from { opacity:0; transform:translateY(-22px) scale(0.96); } to { opacity:1; transform:translateY(0) scale(1); } }
+  @keyframes bannerSlideOut { from { opacity:1; transform:translateY(0) scale(1); }  to { opacity:0; transform:translateY(-18px) scale(0.95); } }
+  @keyframes slideUp        { from { transform:translateY(34px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+  @keyframes fadeIn         { from { opacity:0; } to { opacity:1; } }
+  @keyframes countPop       { 0%{transform:scale(0.4);opacity:0;} 60%{transform:scale(1.12);opacity:1;} 100%{transform:scale(1);opacity:1;} }
+  @keyframes barGrow        { from { height:0; } to { height:var(--bar-h); } }
+  @keyframes shimmerMove    { 0%{transform:translateX(-100%);} 100%{transform:translateX(400%);} }
+  @keyframes ringPulse      { 0%,100%{opacity:.3;transform:scale(1);} 50%{opacity:.9;transform:scale(1.14);} }
+  @keyframes glowPulse      { 0%,100%{opacity:.5;transform:scale(1);} 50%{opacity:1;transform:scale(1.08);} }
+`;
+// ─── Shared wrappers ──────────────────────────────────────────────────────
+const outerStyle = {
+  minHeight: "100vh", background: "#0C1F12",
+  display: "flex", flexDirection: "column",
+  alignItems: "center", justifyContent: "center",
+  padding: 24, gap: 16,
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+};
+const phoneStyle = {
+  width: 390, height: 844, borderRadius: 44, position: "relative", overflow: "hidden",
+  boxShadow: "0 32px 80px rgba(0,0,0,0.55), 0 0 0 2px #2a2a2a",
+  background: C.bg,
+};
+// ══════════════════════════════════════════════════════════════════════════
+// ─── Circular progress ring stat card ─────────────────────────────────────
+function StatRing({ icon, value, label, sub, pct, color }) {
+  const size = 86, stroke = 8;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const off = circ * (1 - Math.max(0, Math.min(100, pct)) / 100);
+  return (
+    <div style={{
+      background: C.white, borderRadius: 16, padding: "14px 8px",
+      boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
+      display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
+    }}>
+      <div style={{ position: "relative", width: size, height: size }}>
+        <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={C.card} strokeWidth={stroke} />
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+            strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={off}
+            style={{ transition: "stroke-dashoffset 0.9s cubic-bezier(0.34,1.2,0.64,1)" }} />
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ fontSize: 17, lineHeight: 1 }}>{icon}</div>
+          <div style={{ fontWeight: 900, fontSize: 15, color: C.black, lineHeight: 1.1, marginTop: 2 }}>{value}</div>
+        </div>
+      </div>
+      <div style={{ fontWeight: 800, fontSize: 12.5, color: C.black, marginTop: 9 }}>{label}</div>
+      <div style={{ fontSize: 10.5, color: C.gray, marginTop: 1, lineHeight: 1.35 }}>{sub}</div>
+    </div>
+  );
+}
+// ─── Value breakdown donut ────────────────────────────────────────────────
+function ValueDonut({ total, segments }) {
+  const size = 138, stroke = 22;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  let acc = 0;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+        <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={C.card} strokeWidth={stroke} />
+          {segments.map((sg, i) => {
+            const seg = (sg.pct / 100) * circ;
+            const el = (
+              <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={sg.color} strokeWidth={stroke}
+                strokeDasharray={`${seg} ${circ - seg}`} strokeDashoffset={-acc}
+                style={{ transition: "stroke-dasharray 0.8s ease, stroke-dashoffset 0.8s ease" }} />
+            );
+            acc += seg;
+            return el;
+          })}
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ fontSize: 10, color: C.gray, fontWeight: 600 }}>Total value</div>
+          <div style={{ fontWeight: 900, fontSize: 24, color: C.black, lineHeight: 1 }}>${total}</div>
+        </div>
+      </div>
+      <div style={{ flex: 1 }}>
+        {segments.map((sg, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: i < segments.length - 1 ? 10 : 0 }}>
+            <div style={{ width: 11, height: 11, borderRadius: 3, background: sg.color, flexShrink: 0 }} />
+            <div style={{ flex: 1, fontSize: 12, fontWeight: 700, color: C.black, lineHeight: 1.2 }}>{sg.label}</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: C.black }}>${sg.amt}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+// ══════════════════════════════════════════════════════════════════════════
+export default function ValueTransparencyDashboard() {
+  const [screen,      setScreen]      = useState("home");
+  const [activeMonth, setActiveMonth] = useState(2);
+  const [activeNav,   setActiveNav]   = useState(0);
+  const [bannerIn,    setBannerIn]    = useState(false);
+  const [bannerOut,   setBannerOut]   = useState(false);
+  const m      = MONTHS[activeMonth];
+  const maxM   = Math.max(...MONTHS.map(x => x.meals));
+  const totals = MONTHS.reduce(
+    (acc, x) => ({ meals: acc.meals + x.meals, hours: acc.hours + x.hours, value: acc.value + x.value }),
+    { meals: 0, hours: 0, value: 0 }
+  );
+  // Ring stats — value vs a monthly goal → fill %
+  const rings = [
+    { icon: "⏱",  value: `${m.hours}h`,    label: "Time Saved",     sub: "vs grocery shopping", color: C.greenMid, pct: (m.hours / 12) * 100 },
+    { icon: "🌱", value: `${m.waste}kg`,   label: "Waste Avoided",  sub: "pre-portioned",       color: "#6DBE45",  pct: (m.waste / 1.0) * 100 },
+    { icon: "🍴", value: `${m.recipes}`,   label: "New Recipes",    sub: "outside your go-to's",color: C.amber,    pct: (m.recipes / 6) * 100 },
+    { icon: "💰", value: `$${m.value}`,    label: "Value Created",  sub: "vs restaurants",      color: C.green,    pct: (m.value / 250) * 100 },
+  ];
+  // Value breakdown — segments sum to m.value
+  const valueSegments = [
+    { label: "Dining-out savings",    color: C.green,   pct: 55 },
+    { label: "Smarter grocery spend", color: "#6DBE45", pct: 27 },
+    { label: "Time value",            color: C.amber,   pct: 18 },
+  ].map(s => ({ ...s, amt: Math.round(m.value * s.pct / 100) }));
+  valueSegments[0].amt += m.value - valueSegments.reduce((a, s) => a + s.amt, 0);
+  // iOS push banner — fires 1.8s after landing on home
+  useEffect(() => {
+    if (screen === "home") {
+      setBannerIn(false); setBannerOut(false);
+      const show = setTimeout(() => setBannerIn(true), 1800);
+      const hide = setTimeout(() => dismissBanner(),   7800);
+      return () => { clearTimeout(show); clearTimeout(hide); };
+    }
+  }, [screen]);
+  function dismissBanner() {
+    setBannerOut(true);
+    setTimeout(() => { setBannerIn(false); setBannerOut(false); }, 420);
+  }
+  // ─── Demo month selector pills (above phone) ───
+  const DemoSelector = () => (
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, letterSpacing: "0.5px", textTransform: "uppercase", marginRight: 4 }}>
+        Month
+      </span>
+      {MONTHS.map((mo, i) => (
+        <div
+          key={mo.label}
+          onClick={() => setActiveMonth(i)}
+          style={{
+            borderRadius: 20, padding: "6px 16px", fontSize: 12, fontWeight: 800, cursor: "pointer",
+            background: activeMonth === i ? C.lime : "rgba(255,255,255,0.12)",
+            color:      activeMonth === i ? C.black : "rgba(255,255,255,0.7)",
+            border:     `1.5px solid ${activeMonth === i ? C.lime : "transparent"}`,
+            transition: "all 0.18s",
+          }}
+        >{mo.label}</div>
+      ))}
+    </div>
+  );
+  // ─── Bottom nav ───
+  const BottomNav = () => (
+    <div style={{
+      position: "absolute", bottom: 0, left: 0, right: 0, height: 76,
+      background: C.white, borderTop: "1px solid rgba(0,0,0,0.07)", display: "flex", zIndex: 12,
+    }}>
+      {NAV.map((item, i) => (
+        <div key={i} onClick={() => setActiveNav(i)} style={{
+          flex: 1, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", gap: 3, cursor: "pointer",
+        }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 17,
+            background: activeNav === i ? `${C.lime}33` : "transparent",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <span style={{ fontSize: 18 }}>{NAV_ICONS[i]}</span>
+          </div>
+          <span style={{ fontSize: 9, fontWeight: 700, color: activeNav === i ? C.green : C.grayLight }}>{item}</span>
+        </div>
+      ))}
+    </div>
+  );
+  // ════════════════════════════════════════════════════════════════════════
+  // SCREEN: HOME
+  // ════════════════════════════════════════════════════════════════════════
+  if (screen === "home") {
+    return (
+      <div style={outerStyle}>
+        <DemoSelector />
+        <div style={phoneStyle}>
+          {/* Status bar */}
+          <div style={{ background: C.green, height: 48, display: "flex", alignItems: "center", padding: "10px 20px 0" }}>
+            <div style={{ flex: 1, color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 600 }}>9:41</div>
+            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>●●● ▮▮▮</div>
+          </div>
+          {/* Greeting header */}
+          <div style={{ background: C.green, padding: "4px 20px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 13 }}>Thursday, Nov 28</div>
+              <div style={{ color: "white", fontSize: 23, fontWeight: 900, marginTop: 3 }}>Hi, Jawdee 👋</div>
+            </div>
+            <span style={{ fontSize: 20, filter: "brightness(0) invert(1)" }}>🔔</span>
+          </div>
+          {/* ── iOS push notification banner ── */}
+          {bannerIn && (
+            <div
+              onClick={() => { dismissBanner(); setScreen("dashboard"); }}
+              style={{
+                position: "absolute", top: 60, left: 12, right: 12, zIndex: 30,
+                background: `linear-gradient(135deg, ${C.green}F4 0%, ${C.greenMid}F4 100%)`,
+                backdropFilter: "blur(18px)",
+                borderRadius: 16, padding: "12px 14px",
+                display: "flex", alignItems: "center", gap: 12,
+                boxShadow: `0 8px 28px ${C.glow}, 0 2px 8px rgba(0,0,0,0.28)`,
+                cursor: "pointer",
+                animation: bannerOut
+                  ? "bannerSlideOut 0.42s ease-in forwards"
+                  : "bannerSlideIn 0.42s cubic-bezier(0.34,1.4,0.64,1) forwards",
+              }}
+            >
+              {/* Pulsing ring + icon */}
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <div style={{
+                  position: "absolute", inset: -5, borderRadius: "50%",
+                  border: `2px solid ${C.lime}`, opacity: 0.5,
+                  animation: "ringPulse 1.8s ease-in-out infinite",
+                }} />
+                <div style={{
+                  width: 42, height: 42, borderRadius: 21,
+                  background: `radial-gradient(circle at 35% 28%, ${C.lime}, ${C.greenMid} 60%, ${C.green})`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+                }}>📊</div>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: "white", fontSize: 13, fontWeight: 900 }}>Your November Impact is ready</span>
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>now</span>
+                </div>
+                <div style={{ color: "rgba(255,255,255,0.78)", fontSize: 11, marginTop: 2, lineHeight: 1.4 }}>
+                  You saved $192 vs eating out this month. Tap to see your report.
+                </div>
+              </div>
+              <div
+                onClick={e => { e.stopPropagation(); dismissBanner(); }}
+                style={{
+                  width: 20, height: 20, borderRadius: 10, flexShrink: 0,
+                  background: "rgba(255,255,255,0.15)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, color: "rgba(255,255,255,0.6)",
+                }}
+              >✕</div>
+            </div>
+          )}
+          {/* Feed */}
+          <div style={{ height: 712, overflowY: "auto", padding: "16px 16px 90px" }}>
+            {/* ★ NEW FEATURE — Impact hero card (premium teaser) */}
+            <div
+              onClick={() => setScreen("dashboard")}
+              style={{
+                position: "relative", overflow: "hidden",
+                borderRadius: 20, padding: 18, marginBottom: 16, cursor: "pointer",
+                background: `linear-gradient(150deg, ${C.green} 0%, #0F3A1C 100%)`,
+                border: "1px solid rgba(141,198,63,0.35)",
+                boxShadow: `0 12px 32px ${C.glow}`,
+                animation: "fadeIn 0.5s ease-out both",
+              }}
+            >
+              {/* Decorative corner glow */}
+              <div style={{
+                position: "absolute", top: -44, right: -34, width: 170, height: 170, borderRadius: "50%",
+                background: `radial-gradient(circle, ${C.lime}55, transparent 70%)`, pointerEvents: "none",
+              }} />
+              {/* Decorative rising area chart */}
+              <svg viewBox="0 0 300 80" preserveAspectRatio="none"
+                style={{ position: "absolute", left: 0, right: 0, bottom: 0, width: "100%", height: 72, opacity: 0.20, pointerEvents: "none" }}>
+                <defs>
+                  <linearGradient id="impactArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={C.lime} /><stop offset="100%" stopColor={C.lime} stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path d="M0,60 L40,52 L80,56 L120,40 L160,46 L200,28 L240,34 L300,16 L300,80 L0,80 Z" fill="url(#impactArea)" />
+                <path d="M0,60 L40,52 L80,56 L120,40 L160,46 L200,28 L240,34 L300,16" fill="none" stroke={C.lime} strokeWidth="2" />
+              </svg>
+              {/* Shimmer strip */}
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, overflow: "hidden" }}>
+                <div style={{
+                  position: "absolute", inset: 0, width: "40%",
+                  background: `linear-gradient(90deg, transparent, ${C.limeSoft}, transparent)`,
+                  animation: "shimmerMove 2.4s linear infinite",
+                }} />
+              </div>
+              {/* Sparkles */}
+              <div style={{ position: "absolute", top: 16, right: 58, color: C.lime, fontSize: 10, opacity: 0.85 }}>✦</div>
+              <div style={{ position: "absolute", top: 44, right: 28, color: "#fff", fontSize: 7, opacity: 0.55 }}>✦</div>
+              {/* NEW pill */}
+              <div style={{
+                position: "absolute", top: 14, right: 14,
+                background: C.lime, color: C.black, fontSize: 9, fontWeight: 800,
+                borderRadius: 6, padding: "3px 9px", letterSpacing: "0.5px",
+              }}>NEW</div>
+              {/* Content */}
+              <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 13, marginBottom: 16 }}>
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <div style={{
+                    position: "absolute", inset: -4, borderRadius: "50%",
+                    border: `1.5px solid ${C.lime}`, opacity: 0.4,
+                    animation: "ringPulse 2s ease-in-out infinite",
+                  }} />
+                  <div style={{
+                    width: 54, height: 54, borderRadius: 27,
+                    background: `radial-gradient(circle at 35% 28%, ${C.limeSoft}, ${C.lime} 45%, ${C.greenMid})`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 26, boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
+                  }}>📊</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "1px", color: C.lime, textTransform: "uppercase", marginBottom: 3 }}>
+                    Monthly Impact Report
+                  </div>
+                  <div style={{ fontSize: 19, fontWeight: 900, color: "#fff", lineHeight: 1.1 }}>Your November Impact</div>
+                </div>
+              </div>
+              {/* CTA */}
+              <div style={{
+                position: "relative",
+                background: `linear-gradient(135deg, ${C.lime}, ${C.greenMid})`,
+                borderRadius: 12, padding: "12px 16px",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+              }}>
+                <span style={{ color: C.black, fontSize: 13.5, fontWeight: 900 }}>See your full report</span>
+                <span style={{ color: C.black, fontSize: 20, fontWeight: 800, lineHeight: 1 }}>→</span>
+              </div>
+            </div>
+            {/* Upcoming delivery card */}
+            <div style={{ background: C.card, borderRadius: 16, padding: "16px 18px", marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 12, color: C.gray, marginBottom: 2 }}>Next delivery</div>
+                  <div style={{ fontWeight: 800, fontSize: 17, color: C.black }}>Monday, Dec 9</div>
+                  <div style={{ fontSize: 12, color: C.gray, marginTop: 2 }}>5 days left to skip or change</div>
+                </div>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 14, background: C.green,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
+                }}>📦</div>
+              </div>
+            </div>
+            {/* This week's meals */}
+            <div style={{ background: C.card, borderRadius: 16, padding: "16px 18px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, fontSize: 16, color: C.black }}>This week's meals</div>
+                <span style={{ color: C.green, fontSize: 13, fontWeight: 700 }}>Edit ›</span>
+              </div>
+              {RECIPES.map((r, i) => (
+                <div key={r.name} style={{
+                  display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
+                  borderBottom: i < 2 ? "1px solid rgba(0,0,0,0.06)" : "none",
+                }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 12, background: r.color, flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: C.black }}>{r.name}</div>
+                    <div style={{ fontSize: 12, color: C.gray }}>{r.time} · {r.cal}</div>
+                  </div>
+                  <span style={{ color: C.grayLight, fontSize: 18 }}>›</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <BottomNav />
+        </div>
+        <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 12, textAlign: "center" }}>
+          Tap the Impact card to open the dashboard
+        </div>
+        <style>{STYLES}</style>
+      </div>
+    );
+  }
+  // ════════════════════════════════════════════════════════════════════════
+  // SCREEN: DASHBOARD
+  // ════════════════════════════════════════════════════════════════════════
+  return (
+    <div style={outerStyle}>
+      <DemoSelector />
+      <div style={phoneStyle}>
+        <div style={{ position: "absolute", inset: 0, background: C.bg }} />
+        <div style={{ position: "relative", zIndex: 10, height: "100%", overflowY: "auto", paddingBottom: 24 }}>
+          {/* Green header */}
+          <div style={{
+            background: `linear-gradient(135deg, ${C.green} 0%, ${C.greenMid} 100%)`,
+            paddingTop: 60, paddingBottom: 22, paddingLeft: 20, paddingRight: 20,
+            position: "relative",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div
+                onClick={() => setScreen("home")}
+                style={{
+                  width: 36, height: 36, borderRadius: 18, background: "rgba(255,255,255,0.18)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", fontSize: 17, color: "white", flexShrink: 0,
+                }}
+              >←</div>
+              <div>
+                <div style={{ color: "white", fontWeight: 900, fontSize: 18 }}>Your HelloFresh Impact</div>
+                <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 1 }}>3 months tracked</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: "16px 16px 0" }}>
+            {/* Hero stat — glowing dark green card */}
+            <div style={{
+              position: "relative", borderRadius: 18, marginBottom: 14,
+              animation: "slideUp 0.5s ease-out both",
+            }}>
+              {/* Glow halo */}
+              <div style={{
+                position: "absolute", inset: -8, borderRadius: 24,
+                background: `radial-gradient(circle at 50% 40%, ${C.glow} 0%, transparent 70%)`,
+                animation: "glowPulse 2.6s ease-in-out infinite", pointerEvents: "none",
+              }} />
+              <div style={{
+                position: "relative",
+                background: `linear-gradient(160deg, ${C.green} 0%, #143F20 100%)`,
+                borderRadius: 18, padding: "26px 20px", color: "white", textAlign: "center",
+                boxShadow: `0 10px 30px ${C.glow}`,
+                overflow: "hidden",
+              }}>
+                {/* Shimmer strip */}
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, overflow: "hidden" }}>
+                  <div style={{
+                    position: "absolute", inset: 0, width: "40%",
+                    background: `linear-gradient(90deg, transparent, ${C.lime}, transparent)`,
+                    animation: "shimmerMove 2.6s linear infinite",
+                  }} />
+                </div>
+                <div key={m.label + "-meals"} style={{ fontSize: 60, fontWeight: 900, lineHeight: 1, animation: "countPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both" }}>{m.meals}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, opacity: 0.92, marginTop: 4 }}>meals cooked in {m.label}</div>
+                <div style={{ fontSize: 13, opacity: 0.65, marginTop: 6 }}>
+                  {activeMonth === 1 ? "Your most active month yet 🎉" : "Building a solid habit 👏"}
+                </div>
+              </div>
+            </div>
+            {/* Stats — circular progress rings */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+              {rings.map((s, i) => (
+                <div key={s.label} style={{ animation: `slideUp 0.5s ${0.1 + i * 0.07}s ease-out both` }}>
+                  <StatRing {...s} />
+                </div>
+              ))}
+            </div>
+            {/* Value breakdown donut */}
+            <div style={{
+              background: C.white, borderRadius: 16, padding: "16px 18px", marginBottom: 14,
+              boxShadow: "0 2px 10px rgba(0,0,0,0.06)", animation: "slideUp 0.5s 0.34s ease-out both",
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 15, color: C.black, marginBottom: 14 }}>Where your value comes from</div>
+              <ValueDonut total={m.value} segments={valueSegments} />
+            </div>
+            {/* Bar chart */}
+            <div style={{
+              background: C.white, borderRadius: 16, padding: "16px 18px", marginBottom: 14,
+              boxShadow: "0 2px 10px rgba(0,0,0,0.06)", animation: "slideUp 0.5s 0.38s ease-out both",
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 15, color: C.black, marginBottom: 16 }}>
+                Meals cooked — 3 month trend
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 92 }}>
+                {MONTHS.map((mo, i) => (
+                  <div key={mo.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                    <div style={{ fontSize: 12, color: C.gray, fontWeight: 700 }}>{mo.meals}</div>
+                    <div style={{ width: "100%", display: "flex", alignItems: "flex-end", height: 62 }}>
+                      <div style={{
+                        width: "100%",
+                        height: `${(mo.meals / maxM) * 62}px`,
+                        "--bar-h": `${(mo.meals / maxM) * 62}px`,
+                        borderRadius: "8px 8px 0 0",
+                        background: i === activeMonth
+                          ? `linear-gradient(180deg, ${C.lime}, ${C.green})`
+                          : "#CEC6BC",
+                        animation: `barGrow 0.6s ${0.4 + i * 0.1}s ease-out both`,
+                        boxShadow: i === activeMonth ? `0 2px 10px ${C.glow}` : "none",
+                      }} />
+                    </div>
+                    <div style={{
+                      fontSize: 12,
+                      color: i === activeMonth ? C.green : C.gray,
+                      fontWeight: i === activeMonth ? 800 : 400,
+                    }}>{mo.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Running total callout */}
+            <div style={{
+              background: C.amberBg, border: "1px solid #F0CB80", borderRadius: 16, padding: "16px 18px",
+              marginBottom: 14, animation: "slideUp 0.5s 0.46s ease-out both",
+            }}>
+              <div style={{ color: C.amber, fontWeight: 800, fontSize: 14 }}>💡 Your 3-month total</div>
+              <div style={{ color: C.black, fontSize: 13, marginTop: 8, lineHeight: 1.65 }}>
+                You've cooked <strong>{totals.meals} meals</strong>, saved{" "}
+                <strong>{totals.hours.toFixed(1)} hours</strong> of grocery time, and created{" "}
+                <strong>${totals.value}</strong> in value — for the cost of about 3 restaurant dinners per month.
+              </div>
+            </div>
+            {/* Share CTA */}
+            <button style={{
+              width: "100%", background: C.black, color: "white",
+              border: "none", borderRadius: 14, padding: "16px 0",
+              fontSize: 15, fontWeight: 900, cursor: "pointer", letterSpacing: "0.2px",
+              animation: "slideUp 0.5s 0.54s ease-out both",
+            }}>
+              Share My Impact
+            </button>
+            <div style={{ height: 16 }} />
+          </div>
+        </div>
+      </div>
+      <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 12, textAlign: "center" }}>
+        Switch months above to update stats · tap ← to go home
+      </div>
+      <style>{STYLES}</style>
+    </div>
+  );
+}
