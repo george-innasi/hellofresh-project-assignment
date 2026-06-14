@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>HelloFresh Retention — Phase 3 Prototypes</title>
+<style>
+  :root{
+    --green:#1E5C2E; --greenmid:#3E8A50; --lime:#8DC63F; --bg:#F4EFE8; --card:#FFFFFF;
+    --ink:#1A1A1A; --gray:#726E68; --line:#E4DED4;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;}
+  .hero{background:linear-gradient(150deg,var(--green) 0%,#0F3A1C 100%);color:#fff;
+    padding:48px 24px 40px;}
+  .wrap{max-width:1000px;margin:0 auto;}
+  .eyebrow{color:var(--lime);font-weight:800;letter-spacing:1px;text-transform:uppercase;font-size:12px;margin-bottom:10px;}
+  .hero h1{margin:0 0 12px;font-size:30px;line-height:1.15;}
+  .hero p{margin:0 0 6px;color:rgba(255,255,255,.85);font-size:15px;line-height:1.6;max-width:760px;}
+  .meta{color:rgba(255,255,255,.6);font-size:13px;margin-top:14px;}
+  .meta a{color:var(--lime);text-decoration:none;font-weight:700;}
+  .section{max-width:1000px;margin:0 auto;padding:30px 24px 56px;}
+  .lead{color:var(--gray);font-size:14px;line-height:1.6;margin:0 0 22px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;
+    display:flex;flex-direction:column;box-shadow:0 2px 12px rgba(0,0,0,.05);transition:transform .15s, box-shadow .15s;}
+  .card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(30,92,46,.16);}
+  .tag{display:inline-block;background:rgba(141,198,63,.18);color:var(--green);font-weight:800;
+    font-size:11px;border-radius:20px;padding:4px 12px;margin-bottom:12px;align-self:flex-start;}
+  .tag.p0{background:var(--green);color:#fff;}
+  .card h3{margin:0 0 8px;font-size:18px;}
+  .card p{margin:0 0 10px;color:var(--gray);font-size:13.5px;line-height:1.55;}
+  .rc{color:var(--greenmid);font-size:12px;font-weight:700;margin-bottom:16px;}
+  .btn{margin-top:auto;display:inline-flex;align-items:center;justify-content:space-between;
+    background:linear-gradient(135deg,var(--lime),var(--greenmid));color:var(--ink);
+    font-weight:900;font-size:14px;text-decoration:none;border-radius:11px;padding:12px 16px;}
+  .btn span{font-size:18px;}
+  .foot{color:var(--gray);font-size:12px;text-align:center;padding:24px;border-top:1px solid var(--line);}
+  .foot a{color:var(--green);}
+</style>
+</head>
+<body>
+  <div class="hero">
+    <div class="wrap">
+      <div class="eyebrow">Hello PM · Batch 51 · George Innasi</div>
+      <h1>HelloFresh Retention — Phase 3 Prototypes</h1>
+      <p><strong>Goal:</strong> improve retention among existing HelloFresh subscribers.</p>
+      <p><strong>P0 problem:</strong> existing subscribers struggle to keep feeling the per-serving price is worth it as ingredient quality quietly declines and the price gap versus groceries widens — leading to skipping, cancel/resubscribe gaming, and silent churn of the highest-value cohort.</p>
+      <p><strong>P0 solution:</strong> Food Quality Feedback — a mechanism for subscribers to report which ingredient fell short, traced to the supplier, replacing vague support tickets with clear, structured feedback.</p>
+      <div class="meta">Tap any prototype below to open it live. &nbsp;·&nbsp; <a href="https://github.com/george-innasi/hellofresh-project-assignment">Source code on GitHub</a></div>
+    </div>
+  </div>
+  <div class="section">
+    <p class="lead">Each prototype explores one solution from the Phase 3 brainstorm, mapped to a root cause of the P0. They are interactive — click through the screens.</p>
+    <div class="grid">
+
+      <div class="card">
+        <span class="tag p0">P0 · Solution</span>
+        <h3>Food Quality Feedback</h3>
+        <p>When a meal misses the mark, the subscriber reports exactly which ingredient fell short and what was wrong (wilted, bruised, spoiled, too small, missing). Each report is traced to its supplier batch — clearer feedback than a support ticket.</p>
+        <div class="rc">RC1 · quality declines, unverifiable by the subscriber</div>
+        <a class="btn" href="./view-04-ingredient-quality-feedback.html">Open prototype <span>→</span></a>
+      </div>
+
+      <div class="card">
+        <span class="tag">Supporting</span>
+        <h3>Value Transparency Dashboard</h3>
+        <p>Shows the value a subscriber has built over time — meals cooked, time and money saved, food waste avoided — so the weekly price keeps feeling worth it.</p>
+        <div class="rc">RC3 · accumulated value is invisible</div>
+        <a class="btn" href="./view-01-value-transparency-dashboard.html">Open prototype <span>→</span></a>
+      </div>
+
+      <div class="card">
+        <span class="tag">Supporting</span>
+        <h3>Predictive Retention Outreach (Basil)</h3>
+        <p>A proactive in-app check-in from Basil when a subscriber starts disengaging. A produce basket on the home screen visibly decays with inactivity; tapping it opens a guided support chat.</p>
+        <div class="rc">RC5 · the weekly skip decision repeats with no intervention</div>
+        <a class="btn" href="./view-02-predictive-retention-outreach.html">Open prototype <span>→</span></a>
+      </div>
+
+      <div class="card">
+        <span class="tag">Supporting</span>
+        <h3>Tenure Milestone Rewards</h3>
+        <p>Recognises long-tenured subscribers with rewards at 3, 6, 9 and 12-month milestones, plus a one-year anniversary thank-you and year-in-review.</p>
+        <div class="rc">RC4 · long-tenure subscribers feel unrecognised vs. new customers</div>
+        <a class="btn" href="./view-03-tenure-milestone-rewards.html">Open prototype <span>→</span></a>
+      </div>
+
+    </div>
+  </div>
+  <div class="foot">Built for the Hello PM Phase 3 assignment · <a href="https://github.com/george-innasi/hellofresh-project-assignment">github.com/george-innasi/hellofresh-project-assignment</a></div>
+</body>
+</html>
