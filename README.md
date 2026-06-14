@@ -4,30 +4,34 @@
 
 Interactive prototype concepts built for the HelloFresh retention assignment (Phase 3 — Diverge → Converge → Build).
 
+### ▶ Live gallery (click to open prototypes)
+
+**https://george-innasi.github.io/hellofresh-project-assignment/**
+
 ## What we're trying to achieve
 
 **Phase 2 goal:** Improve retention among existing HelloFresh subscribers.
 
-**P0 problem:** Existing subscribers struggle to keep feeling the per-serving price is worth paying week after week, because perceived value erodes as ingredient quality quietly declines and the price gap versus groceries widens with every increase. This leads to more frequent skipping, gaming the cancel-and-resubscribe cycle for new-customer pricing, and eventually silent churn of the highest-LTV cohort — the long-tenured subscribers who are most profitable to retain.
+**P0 problem:** Existing subscribers struggle to keep feeling the per-serving price is worth paying week after week, because perceived value erodes as ingredient quality quietly declines and the price gap versus groceries widens with every increase. This leads to more frequent skipping, gaming the cancel-and-resubscribe cycle, and silent churn of the highest-value, long-tenured cohort.
 
-**P0 solution (PRD):** Ingredient Quality Score per Delivery + Auto-Credit Quality Guarantee — make quality *provable* rather than claimed, and turn the moment quality fails into a trust signal instead of a trust break.
+**P0 solution:** **Food Quality Feedback** — a structured, per-ingredient reporting mechanism. When a meal misses the mark, the subscriber reports which ingredient fell short and what was wrong, traced to the supplier batch. It replaces vague support tickets with clear, ground-truth quality signal. (An automatic credit is deferred to a future phase that requires a financial model and user-submitted proof.)
 
 ## Prototypes
 
 Each prototype explores one solution from the Phase 3 brainstorm, mapped to a root cause of the P0.
 
-| # | Prototype | Solution | Root cause |
-|---|-----------|----------|-----------|
-| 01 | `01-value-transparency-dashboard.jsx` | Value Transparency Dashboard — surfaces the value a subscriber has accumulated over time | RC3: accumulated value is invisible |
-| 02 | `02-predictive-retention-outreach.jsx` | Predictive Retention Outreach (Basil assistant) — proactively reaches disengaging subscribers before they churn | RC5: the weekly skip decision repeats with no intervention |
-| 03 | `03-tenure-milestone-rewards.jsx` | Tenure Milestone Rewards & Anniversary — recognises long-tenured subscribers | RC4: long-tenure subscribers feel unrecognised vs. new customers |
-| 04 | `04-ingredient-quality-feedback.jsx` | Ingredient Quality Feedback — lets subscribers report which ingredients were bad, traced to the supplier; the user-facing "Report an issue" companion to the Ingredient Quality Score + Auto-Credit P0 | RC1: quality quietly declines, unverifiable by the subscriber |
+| # | Prototype | Live link | Root cause |
+|---|-----------|-----------|-----------|
+| 04 | **Food Quality Feedback (P0)** | [open](https://george-innasi.github.io/hellofresh-project-assignment/view-04-ingredient-quality-feedback.html) | RC1: quality declines, unverifiable by the subscriber |
+| 01 | Value Transparency Dashboard | [open](https://george-innasi.github.io/hellofresh-project-assignment/view-01-value-transparency-dashboard.html) | RC3: accumulated value is invisible |
+| 02 | Predictive Retention Outreach (Basil) | [open](https://george-innasi.github.io/hellofresh-project-assignment/view-02-predictive-retention-outreach.html) | RC5: the weekly skip decision repeats with no intervention |
+| 03 | Tenure Milestone Rewards | [open](https://george-innasi.github.io/hellofresh-project-assignment/view-03-tenure-milestone-rewards.html) | RC4: long-tenure subscribers feel unrecognised vs. new customers |
 
 ## Stack
 
-React, single-file `.jsx` components (inline styles + SVG). Each file default-exports one component and can be dropped into any React sandbox (e.g. a Vite app) to run.
+React, single-file `.jsx` components (inline styles + SVG). The `view-*.html` pages render each component live via React + Babel from a CDN, so they open directly in a browser with no build step.
 
 ## Related documents
 
-- **PRD:** Ingredient Quality Score + Auto-Credit Quality Guarantee
-- **Phase 3 working doc:** Brainstorm, Prioritization (RICE), Success Metrics, Pitfalls & Mitigations
+- **PRD:** Food Quality Feedback (the P0 solution)
+- **Phase 3 working doc (Steps 1–5):** Brainstorm, Prioritization (RICE), Prototype links, Success Metrics, Pitfalls & Mitigations
