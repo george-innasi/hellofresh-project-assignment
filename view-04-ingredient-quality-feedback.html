@@ -122,7 +122,6 @@ function IngredientFeedback() {
   });
   const reset = () => { setScreen("rate"); setRecipe(null); setIssue(null); setBad([]); setIssues({}); };
 
-  const credit = (bad.length * 3.6).toFixed(2);
   const supplierOf = (n) => recipe?.ingredients.find(i => i.name === n)?.supplier;
   const emojiOf    = (n) => recipe?.ingredients.find(i => i.name === n)?.emoji;
 
@@ -396,7 +395,7 @@ function IngredientFeedback() {
                   <div style={{ background: C.amberBg, border: `1px solid ${C.amber}44`, borderRadius: 14, padding: 16, marginTop: 6 }}>
                     <div style={{ fontSize: 11, fontWeight: 800, color: C.amber, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>What happens next</div>
                     <div style={{ fontSize: 13, color: C.black, lineHeight: 1.65 }}>
-                      We've sent this straight to our quality team to review with the supplier{bad.length > 1 ? "s" : ""}. A <strong>${credit} credit</strong> has been applied to your account automatically.
+                      We've sent this to our quality review team to investigate the flagged ingredient{bad.length > 1 ? "s" : ""} with the supplier. You'll hear back with the outcome and any resolution within 3-5 business days. Thanks for helping us improve quality at the source.
                     </div>
                   </div>
                 </>
