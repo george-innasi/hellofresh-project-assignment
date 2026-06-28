@@ -1,0 +1,1179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Proactive Quality Intelligence | George Innasi</title>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<style>
+  :root{ --green:#1E5C2E; --greenmid:#3E8A50; --lime:#8DC63F; --bg:#F4EFE8; --card:#FFFFFF;
+    --ink:#1A1A1A; --gray:#726E68; --line:#E4DED4; --red:#C0392B; --amber:#A06A0A; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#0C1F12;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;}
+  #root{min-height:100vh;}
+  .loading{color:var(--lime);text-align:center;padding:80px 20px;font-size:15px;}
+</style>
+</head>
+<body>
+<div id="root"><div class="loading">Loading case study…</div></div>
+<script type="text/babel" data-presets="react">
+const { useState } = React;
+
+const C = {
+  green:"#1E5C2E", greenMid:"#3E8A50", lime:"#8DC63F", bg:"#F4EFE8", card:"#EDE8DF",
+  white:"#FFFFFF", black:"#1A1A1A", ink:"#1A1A1A", gray:"#726E68", grayLight:"#B8B2A8",
+  amber:"#A06A0A", amberBg:"#FEF3E2", orange:"#D4600A", red:"#C0392B", line:"#E4DED4",
+};
+
+const RECIPES = [
+  { name:"Honey Garlic Salmon", emoji:"🐟", color:"#C4785A", time:"35 min", ingredients:[
+      { name:"Salmon Fillet", emoji:"🐟", supplier:"Northern Waters Seafood, BC", critical:true },
+      { name:"Garlic", emoji:"🧄", supplier:"Heritage Growers, Ontario" },
+      { name:"Honey", emoji:"🍯", supplier:"Golden Meadow Apiary, Ontario" },
+      { name:"Broccoli", emoji:"🥦", supplier:"Valley Fresh Produce, BC" },
+      { name:"Green Beans", emoji:"🫛", supplier:"Garden State Growers, Ontario" },
+      { name:"Jasmine Rice", emoji:"🍚", supplier:"Pantry Staples Co." } ] },
+  { name:"Thai Basil Chicken", emoji:"🍗", color:"#B06840", time:"30 min", ingredients:[
+      { name:"Chicken Breast", emoji:"🍗", supplier:"Maplebrook Poultry, Ontario", critical:true },
+      { name:"Thai Basil", emoji:"🌿", supplier:"Greenleaf Farms, Quebec" },
+      { name:"Bell Pepper", emoji:"🫑", supplier:"Sunrise Organics, Ontario" },
+      { name:"Garlic", emoji:"🧄", supplier:"Heritage Growers, Ontario" },
+      { name:"Lime", emoji:"🍋", supplier:"Citrus Select, California" },
+      { name:"Jasmine Rice", emoji:"🍚", supplier:"Pantry Staples Co." } ] },
+  { name:"Mushroom & Herb Risotto", emoji:"🍄", color:"#7A9A72", time:"40 min", ingredients:[
+      { name:"Cremini Mushrooms", emoji:"🍄", supplier:"Forest Floor Fungi, Ontario", critical:true },
+      { name:"Arborio Rice", emoji:"🍚", supplier:"Pantry Staples Co.", critical:true },
+      { name:"Parmesan", emoji:"🧀", supplier:"Harmony Dairy, Ontario" },
+      { name:"Shallots", emoji:"🧅", supplier:"Great Plains Growers, Manitoba" },
+      { name:"Fresh Thyme", emoji:"🌿", supplier:"Greenleaf Farms, Quebec" },
+      { name:"Vegetable Stock", emoji:"🥣", supplier:"Pantry Staples Co." } ] },
+];
+const ISSUE_TYPES = [
+  { key:"ingredient", icon:"🥦", label:"Ingredient quality", desc:"Something wasn't fresh or as expected" },
+  { key:"recipe", icon:"📖", label:"Recipe & instructions", desc:"Steps were unclear or didn't work out" },
+  { key:"portion", icon:"⚖️", label:"Portion size", desc:"Too much or too little for the meal" },
+  { key:"packaging", icon:"📦", label:"Packaging & delivery", desc:"Damaged, leaking, or arrived late" },
+  { key:"other", icon:"💬", label:"Something else", desc:"Tell us in your own words" },
+];
+const ISSUE_CONFIG = {
+  portion:   { title:"Portion size", quick:"What was off?", chips:["Too little","Too much","Uneven across servings"], photoLabel:"Add a photo of the portion", photoHint:"A photo next to the recipe card or a common item (like a fork) helps us measure how much you got.", team:"meal portioning" },
+  recipe:    { title:"Recipe & instructions", quick:"What was unclear?", chips:["Unclear quantities","A step was missing","Timing or temperature","Confusing wording"], photoLabel:"Add a screenshot of the step", photoHint:"", team:"recipe content" },
+  packaging: { title:"Packaging & delivery", quick:"What went wrong?", chips:["Arrived late","Leaking","Damaged box","Warm / not cold","Missing items"], photoLabel:"Add a photo of the damage", photoHint:"Snap it before unpacking, while the box and packaging are still intact.", team:"packaging and delivery" },
+  other:     { title:"Something else", quick:null, chips:[], photoLabel:"Add a photo or proof", photoHint:"", team:"the right team" },
+};
+const PROBLEMS = ["Not fresh","Wilted / soft","Bruised / damaged","Spoiled / moldy","Too small","Wrong / missing"];
+const UNUSABLE = ["Spoiled / moldy","Wrong / missing"];
+const OUTCOMES = {
+  full:    { label:"Full meal credit",         color:C.green,    note:"A meal-defining ingredient made the dish uncookable, so the full meal value is credited plus a small goodwill amount for the inconvenience.", verify:true },
+  partial: { label:"Partial credit",           color:C.amber,    note:"A key ingredient was usable but below standard, so a partial credit is applied.", verify:true },
+  micro:   { label:"Micro-credit",             color:C.greenMid, note:"A supporting ingredient was unusable, but the dish was still cookable, so it is credited at the ingredient's value.", verify:false },
+  token:   { label:"Logged, no credit needed", color:C.gray,     note:"A supporting ingredient was slightly below standard. It is logged and routed to the right team; no credit is required.", verify:false },
+};
+function compensationOutcome(recipe, bad, issues, missing){
+  let cu=false, cd=false, su=false, criticalCount=0;
+  (bad||[]).forEach(n=>{
+    const ing = recipe && recipe.ingredients.find(i=>i.name===n);
+    const crit = !!(ing && ing.critical);
+    if(crit) criticalCount++;
+    const tags = (issues && issues[n]) || [];
+    const unusable = tags.some(t=>UNUSABLE.includes(t));
+    const sev = unusable?2:(tags.length?1:0);
+    if(crit && sev===2) cu=true; else if(crit && sev>=1) cd=true; else if(!crit && sev===2) su=true;
+  });
+  (missing||[]).forEach(n=>{
+    const ing = recipe && recipe.ingredients.find(i=>i.name===n);
+    const crit = !!(ing && ing.critical);
+    if(crit){ cu=true; criticalCount++; } else { su=true; }
+  });
+  const cumulative = ((bad||[]).length + (missing||[]).length)>=3 || criticalCount>=2;
+  if(cu || cumulative) return OUTCOMES.full;
+  if(cd) return OUTCOMES.partial;
+  if(su) return OUTCOMES.micro;
+  return OUTCOMES.token;
+}
+
+const STYLES = `
+  @keyframes slideUp  { from { transform:translateY(26px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+  @keyframes checkPop { 0%{transform:scale(0);opacity:0;} 60%{transform:scale(1.2);opacity:1;} 100%{transform:scale(1);opacity:1;} }
+  .pageWrap{max-width:1180px;margin:0 auto;padding:0 20px;}
+  .stage{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;align-items:flex-start;}
+  table.cmp{width:100%;border-collapse:collapse;background:var(--card);border-radius:14px;overflow:hidden;font-size:13px;}
+  table.cmp th{background:var(--green);color:#fff;text-align:left;padding:11px 13px;font-size:12px;font-weight:800;}
+  table.cmp th.bad{background:#7a3b1f;}
+  table.cmp td{padding:11px 13px;border-top:1px solid var(--line);vertical-align:top;line-height:1.45;color:var(--ink);}
+  table.cmp td.dim{font-weight:800;color:var(--green);width:20%;}
+  table.cmp td.bad{background:#FBEDE7;}
+  table.cmp td.good{background:#EAF4E5;}
+  @media(max-width:560px){ table.cmp{font-size:12px;} table.cmp td,table.cmp th{padding:8px;} }
+`;
+
+const phoneStyle = { width:360, height:740, borderRadius:42, position:"relative", overflow:"hidden",
+  boxShadow:"0 28px 70px rgba(0,0,0,0.35), 0 0 0 2px #2a2a2a", background:C.bg, flexShrink:0 };
+
+function SectionLabel({ children }){ return <div style={{ fontSize:12.5, fontWeight:800, color:C.black, margin:"16px 0 8px" }}>{children}</div>; }
+function Chip({ label, on, onClick }){
+  return <div onClick={onClick} style={{ borderRadius:20, padding:"7px 13px", fontSize:12.5, fontWeight:700, cursor:"pointer",
+    background:on?C.green:C.bg, color:on?"white":C.gray, border:`1.5px solid ${on?C.green:C.card}`, transition:"all 0.15s" }}>{label}</div>;
+}
+function Field({ value, onChange, placeholder, minHeight=84 }){
+  return <textarea value={value} onChange={onChange} placeholder={placeholder} style={{ width:"100%", boxSizing:"border-box",
+    border:`1.5px solid ${C.card}`, borderRadius:12, padding:"11px 13px", fontSize:13, color:C.black, fontFamily:"inherit",
+    resize:"none", minHeight, outline:"none", background:C.white, lineHeight:1.5 }} />;
+}
+function PhotoTile({ added, onToggle, label, hint }){
+  return (
+    <div>
+      <div onClick={onToggle} style={{ border:`1.5px dashed ${added?C.green:C.grayLight}`, background:added?`${C.green}0E`:C.white, borderRadius:12, padding:"16px 12px", textAlign:"center", cursor:"pointer", transition:"all .15s" }}>
+        <div style={{ fontSize:22 }}>{added?"✓":"📷"}</div>
+        <div style={{ fontSize:12.5, fontWeight:700, color:added?C.green:C.gray, marginTop:4 }}>{added?"Photo added":label}</div>
+      </div>
+      {hint && <div style={{ fontSize:11, color:C.amber, marginTop:6, lineHeight:1.45 }}>💡 {hint}</div>}
+    </div>
+  );
+}
+function Toggle({ title, children, dark=false, color }){
+  const [open,setOpen] = useState(false);
+  const titleColor = color || (dark ? "#fff" : C.green);
+  const bg = dark ? "rgba(255,255,255,0.05)" : C.white;
+  const bd = dark ? "rgba(255,255,255,0.14)" : C.line;
+  const bodyColor = dark ? "rgba(255,255,255,.82)" : C.ink;
+  return (
+    <div style={{ background:bg, border:`1px solid ${bd}`, borderRadius:12, marginBottom:10, overflow:"hidden" }}>
+      <div onClick={()=>setOpen(o=>!o)} style={{ display:"flex", alignItems:"center", gap:10, padding:"13px 16px", cursor:"pointer" }}>
+        <span style={{ color:C.lime, fontSize:11, transition:"transform .15s", transform:open?"rotate(90deg)":"none", display:"inline-block", flexShrink:0 }}>▶</span>
+        <span style={{ fontSize:14, fontWeight:800, color:titleColor, flex:1 }}>{title}</span>
+      </div>
+      {open && <div style={{ padding:"2px 16px 14px 37px", fontSize:13, color:bodyColor, lineHeight:1.65 }}>{children}</div>}
+    </div>
+  );
+}
+function BackArrow({onClick}){
+  return <div onClick={onClick} style={{ width:34, height:34, borderRadius:17, background:"rgba(255,255,255,0.18)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:16, color:"white", flexShrink:0 }}>←</div>;
+}
+
+/* ── HelloFresh today: a plain replica of the current reporting path ── */
+function HelloFreshToday(){
+  const [screen,setScreen] = useState("home");
+  const [chatText,setChatText] = useState("");
+  const TopBar = ({title,onBack}) => (
+    <div style={{ background:`linear-gradient(135deg, ${C.green} 0%, ${C.greenMid} 100%)`, paddingTop:46, paddingBottom:16, paddingLeft:18, paddingRight:18, display:"flex", alignItems:"center", gap:12 }}>
+      {onBack && <BackArrow onClick={onBack}/>}
+      <div style={{ color:"white", fontWeight:900, fontSize:17 }}>{title}</div>
+    </div>
+  );
+  return (
+    <div style={phoneStyle}>
+      {screen==="home" && (
+        <div style={{height:"100%",overflowY:"auto"}}>
+          <div style={{ background:`linear-gradient(135deg, ${C.green} 0%, ${C.greenMid} 100%)`, paddingTop:46, paddingBottom:20, paddingLeft:20, paddingRight:20 }}>
+            <div style={{ color:"rgba(255,255,255,0.65)", fontSize:13 }}>Last box · delivered Dec 4</div>
+            <div style={{ color:"white", fontSize:22, fontWeight:900, marginTop:3 }}>Rate your recipes</div>
+          </div>
+          <div style={{ padding:"16px 16px 24px" }}>
+            {RECIPES.map(r=>(
+              <div key={r.name} style={{ background:C.white, borderRadius:16, padding:14, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:14 }}>
+                <div style={{ width:46, height:46, borderRadius:12, background:r.color, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>{r.emoji}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:800, color:C.black }}>{r.name}</div>
+                  <div style={{ fontSize:11, color:C.gray, marginTop:2 }}>{r.time} · {r.ingredients.length} ingredients</div>
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={()=>setScreen("rated")} style={{ width:36, height:36, borderRadius:11, border:`1.5px solid ${C.card}`, background:C.bg, cursor:"pointer", fontSize:16 }}>👍</button>
+                  <button onClick={()=>setScreen("rated")} style={{ width:36, height:36, borderRadius:11, border:`1.5px solid ${C.red}44`, background:`${C.red}10`, cursor:"pointer", fontSize:16 }}>👎</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {screen==="rated" && (
+        <div style={{height:"100%",overflowY:"auto"}}>
+          <TopBar title="Thanks for rating!" onBack={()=>setScreen("home")}/>
+          <div style={{padding:"18px 16px"}}>
+            <div style={{ background:C.white, borderRadius:14, padding:16, boxShadow:"0 2px 8px rgba(0,0,0,0.05)", fontSize:13.5, color:C.black, lineHeight:1.6 }}>Your rating has been saved. It helps us improve our recipes.</div>
+            <button onClick={()=>setScreen("help")} style={{ width:"100%", marginTop:16, background:C.green, color:"white", border:"none", borderRadius:14, padding:"15px 0", fontSize:15, fontWeight:900, cursor:"pointer" }}>Report a problem with this box</button>
+            <button onClick={()=>setScreen("home")} style={{ width:"100%", marginTop:10, background:"transparent", color:C.gray, border:`1.5px solid ${C.card}`, borderRadius:14, padding:"12px 0", fontSize:13, fontWeight:700, cursor:"pointer" }}>Back to my box</button>
+          </div>
+        </div>
+      )}
+      {screen==="help" && (
+        <div style={{height:"100%",overflowY:"auto"}}>
+          <TopBar title="Help Center" onBack={()=>setScreen("rated")}/>
+          <div style={{padding:"16px 16px"}}>
+            <div style={{ background:C.white, borderRadius:12, padding:"12px 14px", color:C.grayLight, fontSize:13, border:`1.5px solid ${C.card}` }}>🔍 Search help articles…</div>
+            <div style={{fontSize:11, fontWeight:800, color:C.gray, letterSpacing:.5, textTransform:"uppercase", margin:"18px 0 8px"}}>Popular topics</div>
+            {["Manage my subscription","Skip or reschedule a box","Damaged or missing ingredient","Refunds & credits","Update payment"].map(t=>(
+              <div key={t} onClick={()=> t.startsWith("Damaged") ? setScreen("article") : null }
+                style={{ background:C.white, borderRadius:12, padding:"13px 14px", marginBottom:9, display:"flex", justifyContent:"space-between", alignItems:"center",
+                  cursor:t.startsWith("Damaged")?"pointer":"default", boxShadow:"0 1px 5px rgba(0,0,0,0.04)" }}>
+                <span style={{fontSize:13.5, fontWeight:t.startsWith("Damaged")?800:600, color:C.black}}>{t}</span><span style={{color:C.grayLight}}>›</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {screen==="article" && (
+        <div style={{height:"100%",overflowY:"auto"}}>
+          <TopBar title="Damaged or missing ingredient" onBack={()=>setScreen("help")}/>
+          <div style={{padding:"16px 16px"}}>
+            <div style={{ background:C.white, borderRadius:14, padding:16, boxShadow:"0 2px 8px rgba(0,0,0,0.05)", fontSize:13, color:C.black, lineHeight:1.65 }}>
+              If an item was missing, spoiled, damaged, or your box arrived unsafe, you may be eligible for a credit or refund:
+              <ul style={{margin:"10px 0 0", paddingLeft:18}}>
+                <li>Report within 7 days of delivery.</li>
+                <li>Have timestamped photos of the issue ready.</li>
+                <li>Not covered: meals you simply did not enjoy, or boxes not skipped before the cutoff.</li>
+              </ul>
+            </div>
+            <div style={{fontSize:11, fontWeight:800, color:C.gray, letterSpacing:.5, textTransform:"uppercase", margin:"18px 0 8px"}}>Contact us</div>
+            <div onClick={()=>setScreen("chat")} style={{ background:C.white, borderRadius:12, padding:"13px 14px", marginBottom:9, display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", border:`1.5px solid ${C.green}`, boxShadow:"0 1px 5px rgba(0,0,0,0.04)" }}>
+              <span style={{fontSize:13.5, fontWeight:800, color:C.black}}>💬 Live chat</span><span style={{color:C.grayLight}}>›</span>
+            </div>
+            <div style={{ background:C.white, borderRadius:12, padding:"13px 14px", marginBottom:9, display:"flex", justifyContent:"space-between", alignItems:"center", color:C.gray }}>
+              <span style={{fontSize:13.5, fontWeight:600}}>📞 Call 1-800-733-2414</span><span style={{color:C.grayLight}}>›</span>
+            </div>
+            <div style={{ background:C.white, borderRadius:12, padding:"13px 14px", display:"flex", justifyContent:"space-between", alignItems:"center", color:C.gray }}>
+              <span style={{fontSize:13.5, fontWeight:600}}>📝 Self-report tool</span><span style={{color:C.grayLight}}>›</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {screen==="chat" && (
+        <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
+          <TopBar title="Live chat · Customer Care" onBack={()=>setScreen("article")}/>
+          <div style={{flex:1, overflowY:"auto", padding:"16px 14px", background:C.bg}}>
+            <div style={{maxWidth:"82%", background:C.white, borderRadius:"4px 14px 14px 14px", padding:"10px 13px", fontSize:13, color:C.black, marginBottom:10, boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+              Hi Jawdee 👋 Please describe your issue in a few words and an agent will assist.
+            </div>
+            {chatText.trim() && (
+              <div style={{maxWidth:"82%", marginLeft:"auto", background:C.green, color:"#fff", borderRadius:"14px 4px 14px 14px", padding:"10px 13px", fontSize:13, marginBottom:10}}>{chatText}</div>
+            )}
+            <div style={{fontSize:11, color:C.gray, textAlign:"center", margin:"6px 0"}}>Avg. response time: 4 to 11 min</div>
+          </div>
+          <div style={{padding:"10px 12px", background:C.white, borderTop:`1px solid ${C.card}`}}>
+            <Field value={chatText} onChange={e=>setChatText(e.target.value)} placeholder="Type your issue…" minHeight={56}/>
+            <button disabled={!chatText.trim()} onClick={()=>setScreen("email")} style={{ width:"100%", marginTop:8, border:"none", borderRadius:12, padding:"13px 0", fontSize:14, fontWeight:900, cursor:chatText.trim()?"pointer":"default", background:chatText.trim()?C.green:C.card, color:chatText.trim()?"#fff":C.grayLight }}>Send</button>
+          </div>
+        </div>
+      )}
+      {screen==="email" && (
+        <div style={{height:"100%",overflowY:"auto"}}>
+          <div style={{ background:"#3a3a3c", paddingTop:46, paddingBottom:14, paddingLeft:18, paddingRight:18, display:"flex", alignItems:"center", gap:12 }}>
+            <BackArrow onClick={()=>setScreen("chat")}/>
+            <div style={{ color:"white", fontWeight:900, fontSize:17 }}>Mail: New Message</div>
+          </div>
+          <div style={{padding:"14px 16px"}}>
+            <div style={{ background:C.white, borderRadius:12, padding:14, boxShadow:"0 2px 8px rgba(0,0,0,0.05)", fontSize:13, color:C.black }}>
+              <div style={{borderBottom:`1px solid ${C.card}`, padding:"6px 0", color:C.gray}}><strong style={{color:C.black}}>To:</strong> care@hellofresh.com</div>
+              <div style={{borderBottom:`1px solid ${C.card}`, padding:"6px 0", color:C.gray}}><strong style={{color:C.black}}>Subject:</strong> Damaged ingredient photo</div>
+              <div style={{ border:`1.5px dashed ${C.grayLight}`, borderRadius:10, padding:"16px 12px", textAlign:"center", marginTop:10 }}>
+                <div style={{fontSize:22}}>📎</div><div style={{fontSize:12, color:C.gray, fontWeight:700, marginTop:4}}>Attach photo from camera roll</div>
+              </div>
+            </div>
+            <button onClick={()=>setScreen("resolution")} style={{ width:"100%", marginTop:14, background:C.green, color:"white", border:"none", borderRadius:14, padding:"15px 0", fontSize:15, fontWeight:900, cursor:"pointer" }}>Send email & return to chat</button>
+          </div>
+        </div>
+      )}
+      {screen==="resolution" && (
+        <div style={{height:"100%",overflowY:"auto"}}>
+          <TopBar title="Live chat · Customer Care" onBack={()=>setScreen("email")}/>
+          <div style={{padding:"16px 14px"}}>
+            <div style={{maxWidth:"86%", background:C.white, borderRadius:"4px 14px 14px 14px", padding:"12px 14px", fontSize:13, color:C.black, marginBottom:12, boxShadow:"0 1px 4px rgba(0,0,0,.05)", lineHeight:1.55}}>
+              We're sorry to hear that. A $13 account credit has been applied to your next box. Card refunds, if approved, take 5 to 10 business days. Is there anything else?
+            </div>
+            <button onClick={()=>setScreen("home")} style={{ width:"100%", marginTop:6, background:C.green, color:"white", border:"none", borderRadius:14, padding:"15px 0", fontSize:15, fontWeight:900, cursor:"pointer" }}>Close chat</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── My proposed solution: structured in-app Food Quality Feedback ── */
+function IngredientFeedback(){
+  const [screen,setScreen] = useState("rate");
+  const [recipe,setRecipe] = useState(null);
+  const [issue,setIssue] = useState(null);
+  const [bad,setBad] = useState([]);
+  const [issues,setIssues] = useState({});
+  const [ratings,setRatings] = useState({});
+  const [detail,setDetail] = useState({picks:[],photo:false,note:""});
+  const [missing,setMissing] = useState([]);
+  const [missingNote,setMissingNote] = useState("");
+
+  const startReport = (r)=>{ setRecipe(r); setIssue(null); setBad([]); setIssues({}); setDetail({picks:[],photo:false,note:""}); setMissing([]); setMissingNote(""); setScreen("issue"); };
+  const chooseIssue = (t)=>{ setIssue(t); setDetail({picks:[],photo:false,note:""}); setMissing([]); setMissingNote(""); setScreen(t.key==="ingredient"?"ingredients":t.key); };
+  const toggleBad = (n)=> setBad(b=> b.includes(n)?b.filter(x=>x!==n):[...b,n]);
+  const toggleMissing = (n)=> setMissing(m=> m.includes(n)?m.filter(x=>x!==n):[...m,n]);
+  const toggleProb = (n,p)=> setIssues(prev=>{ const cur=prev[n]||[]; return {...prev,[n]:cur.includes(p)?cur.filter(x=>x!==p):[...cur,p]}; });
+  const reset = ()=>{ setScreen("rate"); setRecipe(null); setIssue(null); setBad([]); setIssues({}); setDetail({picks:[],photo:false,note:""}); setMissing([]); setMissingNote(""); };
+  const supplierOf = (n)=> recipe?.ingredients.find(i=>i.name===n)?.supplier;
+  const emojiOf = (n)=> recipe?.ingredients.find(i=>i.name===n)?.emoji;
+
+  const Stepper = ({total,index})=>(
+    <div style={{ display:"flex", gap:6, marginTop:12 }}>
+      {Array.from({length:total}).map((_,i)=>(
+        <div key={i} style={{ height:4, flex:1, borderRadius:2, background:i<=index?C.lime:"rgba(255,255,255,0.25)", transition:"background 0.3s" }} />
+      ))}
+    </div>
+  );
+  const BackHeader = ({title,sub,onBack,step})=>(
+    <div style={{ background:`linear-gradient(135deg, ${C.green} 0%, ${C.greenMid} 100%)`, paddingTop:46, paddingBottom:16, paddingLeft:18, paddingRight:18 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+        <BackArrow onClick={onBack}/>
+        <div>
+          <div style={{ color:"white", fontWeight:900, fontSize:16 }}>{title}</div>
+          {sub && <div style={{ color:"rgba(255,255,255,0.7)", fontSize:12, marginTop:1 }}>{sub}</div>}
+        </div>
+      </div>
+      {step && <Stepper total={step[0]} index={step[1]} />}
+    </div>
+  );
+  const SubmitBar = ({onClick,disabled,label})=>(
+    <div style={{ padding:"12px 16px 18px", background:C.white, borderTop:`1px solid ${C.card}` }}>
+      <button disabled={disabled} onClick={onClick} style={{ width:"100%", border:"none", borderRadius:14, padding:"15px 0", fontSize:15, fontWeight:900, cursor:disabled?"default":"pointer", background:disabled?C.card:C.green, color:disabled?C.grayLight:"white", transition:"all 0.2s" }}>{label}</button>
+    </div>
+  );
+
+  return (
+    <div style={phoneStyle}>
+      {screen==="rate" && (
+        <div style={{ height:"100%", overflowY:"auto" }}>
+          <div style={{ background:`linear-gradient(135deg, ${C.green} 0%, ${C.greenMid} 100%)`, paddingTop:46, paddingBottom:20, paddingLeft:20, paddingRight:20 }}>
+            <div style={{ color:"rgba(255,255,255,0.65)", fontSize:13 }}>Last box · delivered Dec 4</div>
+            <div style={{ color:"white", fontSize:22, fontWeight:900, marginTop:3 }}>How were your meals?</div>
+            <div style={{ color:"rgba(255,255,255,0.78)", fontSize:12.5, marginTop:8, lineHeight:1.5 }}>Your feedback is traced straight to the supplier, so we can fix quality at the source.</div>
+          </div>
+          <div style={{ padding:"16px 16px 32px" }}>
+            {RECIPES.map(r=>{
+              const rated = ratings[r.name];
+              return (
+                <div key={r.name} style={{ background:C.white, borderRadius:16, padding:14, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:14 }}>
+                  <div style={{ width:46, height:46, borderRadius:12, background:r.color, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>{r.emoji}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:800, color:C.black }}>{r.name}</div>
+                    <div style={{ fontSize:11, color:C.gray, marginTop:2 }}>{r.time} · {r.ingredients.length} ingredients</div>
+                  </div>
+                  {rated==="up" ? (
+                    <div style={{ display:"flex", alignItems:"center", gap:6, color:C.green, fontSize:12, fontWeight:800 }}><span style={{ fontSize:16 }}>👍</span> Thanks!</div>
+                  ) : (
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={()=>setRatings(p=>({...p,[r.name]:"up"}))} style={{ width:36, height:36, borderRadius:11, border:`1.5px solid ${C.card}`, background:C.bg, cursor:"pointer", fontSize:16 }}>👍</button>
+                      <button onClick={()=>startReport(r)} style={{ width:36, height:36, borderRadius:11, border:`1.5px solid ${C.red}44`, background:`${C.red}10`, cursor:"pointer", fontSize:16 }}>👎</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {screen==="issue" && recipe && (
+        <div style={{ height:"100%", overflowY:"auto" }}>
+          <BackHeader title="Report an issue" sub={recipe.name} onBack={reset} step={[3,0]} />
+          <div style={{ padding:"18px 16px 32px" }}>
+            <div style={{ fontSize:16, fontWeight:900, color:C.black, marginBottom:4 }}>Sorry that meal missed the mark.</div>
+            <div style={{ fontSize:13, color:C.gray, marginBottom:16 }}>What was the main issue?</div>
+            {ISSUE_TYPES.map(t=>(
+              <div key={t.key} onClick={()=>chooseIssue(t)} style={{ background:C.white, borderRadius:14, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:14, cursor:"pointer", boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                <div style={{ width:42, height:42, borderRadius:12, background:C.bg, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:21 }}>{t.icon}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:800, color:C.black }}>{t.label}</div>
+                  <div style={{ fontSize:12, color:C.gray, marginTop:1 }}>{t.desc}</div>
+                </div>
+                <span style={{ color:C.grayLight, fontSize:18 }}>›</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {screen==="ingredients" && recipe && (
+        <div style={{ height:"100%", display:"flex", flexDirection:"column" }}>
+          <BackHeader title="Which ingredients?" sub={recipe.name} onBack={()=>setScreen("issue")} step={[3,1]} />
+          <div style={{ flex:1, overflowY:"auto", padding:"16px 16px" }}>
+            <div style={{ fontSize:13, color:C.gray, marginBottom:14, lineHeight:1.5 }}>Tap the ingredient(s) that had a problem. We'll trace each back to its supplier.</div>
+            {recipe.ingredients.map(ing=>{
+              const on = bad.includes(ing.name);
+              return (
+                <div key={ing.name} onClick={()=>toggleBad(ing.name)} style={{ background:on?`${C.green}0E`:C.white, borderRadius:14, padding:"12px 14px", marginBottom:10, display:"flex", alignItems:"center", gap:13, cursor:"pointer", border:`1.5px solid ${on?C.green:C.card}`, boxShadow:"0 1px 5px rgba(0,0,0,0.04)", transition:"all 0.15s" }}>
+                  <div style={{ width:40, height:40, borderRadius:10, background:C.bg, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>{ing.emoji}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:C.black }}>{ing.name}</div>
+                    <div style={{ fontSize:11, color:C.gray, marginTop:1 }}>{ing.supplier}</div>
+                  </div>
+                  <div style={{ width:24, height:24, borderRadius:7, flexShrink:0, border:`2px solid ${on?C.green:C.grayLight}`, background:on?C.green:"transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:14, fontWeight:900 }}>{on?"✓":""}</div>
+                </div>
+              );
+            })}
+            <div style={{ height:6 }} />
+            <SectionLabel>Was anything missing from your box?</SectionLabel>
+            <div style={{ fontSize:12, color:C.gray, marginBottom:8, lineHeight:1.5 }}>Tap any ingredient that did not arrive.</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
+              {recipe.ingredients.map(ing=>(<Chip key={"m"+ing.name} label={ing.name} on={missing.includes(ing.name)} onClick={()=>toggleMissing(ing.name)} />))}
+            </div>
+            <SectionLabel>Something missing that isn't listed?</SectionLabel>
+            <Field value={missingNote} onChange={e=>setMissingNote(e.target.value)} placeholder="e.g. the spice blend sachet was not in the box" minHeight={60}/>
+            <div style={{ height:8 }} />
+          </div>
+          <SubmitBar disabled={bad.length===0 && missing.length===0 && !missingNote.trim()} onClick={()=>setScreen("detail")} label={(bad.length===0 && missing.length===0 && !missingNote.trim())?"Select a problem or missing item":"Continue"} />
+        </div>
+      )}
+      {screen==="detail" && recipe && (
+        <div style={{ height:"100%", display:"flex", flexDirection:"column" }}>
+          <BackHeader title="What was wrong?" sub={recipe.name} onBack={()=>setScreen("ingredients")} step={[3,2]} />
+          <div style={{ flex:1, overflowY:"auto", padding:"16px 16px" }}>
+            {bad.length>0 && <div style={{ fontSize:13, color:C.gray, marginBottom:14, lineHeight:1.5 }}>Pick what went wrong with each. This tells us exactly what to fix.</div>}
+            {bad.map(n=>(
+              <div key={n} style={{ background:C.white, borderRadius:16, padding:14, marginBottom:12, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+                  <div style={{ width:34, height:34, borderRadius:9, background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>{emojiOf(n)}</div>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:800, color:C.black }}>{n}</div>
+                    <div style={{ fontSize:10.5, color:C.gray }}>{supplierOf(n)}</div>
+                  </div>
+                </div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
+                  {PROBLEMS.map(p=>(<Chip key={p} label={p} on={(issues[n]||[]).includes(p)} onClick={()=>toggleProb(n,p)} />))}
+                </div>
+              </div>
+            ))}
+            {(missing.length>0 || missingNote.trim()) && (
+              <div style={{ background:`${C.amber}0E`, border:`1px solid ${C.amber}44`, borderRadius:14, padding:14, marginBottom:12 }}>
+                <div style={{ fontSize:12.5, fontWeight:800, color:C.amber, marginBottom:6 }}>Missing items</div>
+                {missing.length>0 && <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom: missingNote.trim()?8:0 }}>{missing.map(n=>(<span key={n} style={{ background:C.white, border:`1px solid ${C.amber}55`, color:C.amber, borderRadius:14, padding:"3px 10px", fontSize:11.5, fontWeight:700 }}>{n}</span>))}</div>}
+                {missingNote.trim() && <div style={{ fontSize:12.5, color:C.ink, lineHeight:1.5 }}>{missingNote}</div>}
+              </div>
+            )}
+            <SectionLabel>Add a photo (required)</SectionLabel>
+            <PhotoTile added={detail.photo} onToggle={()=>setDetail(d=>({...d,photo:!d.photo}))} label="Add a photo of your box or the item" hint="Submit a photo for faster resolution." />
+            <div style={{ height:8 }} />
+          </div>
+          <SubmitBar disabled={!detail.photo} onClick={()=>setScreen("done")} label={detail.photo?"Submit feedback":"Add a photo to submit"} />
+        </div>
+      )}
+      {recipe && issue && ISSUE_CONFIG[issue.key] && screen===issue.key && (()=>{ const cfg=ISSUE_CONFIG[issue.key]; return (
+        <div style={{ height:"100%", display:"flex", flexDirection:"column" }}>
+          <BackHeader title={cfg.title} sub={recipe.name} onBack={()=>setScreen("issue")} step={[2,1]} />
+          <div style={{ flex:1, overflowY:"auto", padding:"16px 16px" }}>
+            <div style={{ fontSize:13, color:C.gray, lineHeight:1.5 }}>Add a couple of details and a photo so our team can verify it quickly.</div>
+            {cfg.quick && <SectionLabel>{cfg.quick}</SectionLabel>}
+            {cfg.chips.length>0 && (
+              <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
+                {cfg.chips.map(c=>(<Chip key={c} label={c} on={detail.picks.includes(c)} onClick={()=>setDetail(d=>({...d, picks: d.picks.includes(c)?d.picks.filter(x=>x!==c):[...d.picks,c]}))} />))}
+              </div>
+            )}
+            <SectionLabel>{cfg.photoLabel}</SectionLabel>
+            <PhotoTile added={detail.photo} onToggle={()=>setDetail(d=>({...d,photo:!d.photo}))} label={cfg.photoLabel} hint={cfg.photoHint}/>
+            <SectionLabel>Anything to add?</SectionLabel>
+            <Field value={detail.note} onChange={e=>setDetail(d=>({...d,note:e.target.value}))} placeholder="Optional: describe it in a few words." minHeight={80}/>
+            <div style={{ height:8 }} />
+          </div>
+          <SubmitBar disabled={!detail.photo} onClick={()=>setScreen("done")} label={detail.photo?"Submit feedback":"Add a photo to submit"} />
+        </div>
+      ); })()}
+      {screen==="done" && (
+        <div style={{ height:"100%", overflowY:"auto" }}>
+          <div style={{ background:`linear-gradient(160deg, ${C.green} 0%, #0F3A1C 100%)`, paddingTop:56, paddingBottom:28, paddingLeft:20, paddingRight:20, textAlign:"center" }}>
+            <div style={{ width:72, height:72, borderRadius:36, background:C.lime, margin:"0 auto 14px", display:"flex", alignItems:"center", justifyContent:"center", fontSize:34, color:"white", fontWeight:900, boxShadow:"0 8px 26px rgba(141,198,63,0.5)", animation:"checkPop 0.55s cubic-bezier(0.34,1.56,0.64,1) both" }}>✓</div>
+            <div style={{ color:"white", fontSize:21, fontWeight:900 }}>Thanks, Jawdee!</div>
+            <div style={{ color:"rgba(255,255,255,0.75)", fontSize:13, marginTop:6, lineHeight:1.5 }}>Your feedback on <strong style={{ color:"white" }}>{recipe?.name}</strong> has been logged.</div>
+          </div>
+          <div style={{ padding:"16px 16px 32px" }}>
+            <div style={{ fontSize:11, fontWeight:800, color:C.gray, letterSpacing:0.6, textTransform:"uppercase", marginBottom:12 }}>{issue?.key==="ingredient"?"Flagged & traced to supplier":`Reported: ${issue?.label}`}</div>
+            {issue?.key==="ingredient" && bad.map(n=>(
+              <div key={n} style={{ background:C.white, borderRadius:14, padding:14, marginBottom:10, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:11 }}>
+                  <div style={{ width:36, height:36, borderRadius:10, background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>{emojiOf(n)}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:800, color:C.black }}>{n}</div>
+                    <div style={{ fontSize:11, color:C.gray }}>↳ {supplierOf(n)}</div>
+                  </div>
+                </div>
+                {(issues[n]||[]).length>0 && (
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginTop:10 }}>
+                    {(issues[n]||[]).map(p=>(<span key={p} style={{ background:`${C.red}12`, color:C.red, borderRadius:14, padding:"3px 10px", fontSize:11, fontWeight:700 }}>{p}</span>))}
+                  </div>
+                )}
+              </div>
+            ))}
+            {issue && issue.key==="ingredient" && (missing.length>0 || missingNote.trim()) && (
+              <div style={{ background:C.white, border:`1px solid ${C.amber}55`, borderRadius:14, padding:14, marginBottom:10, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                <div style={{ fontSize:11, fontWeight:800, color:C.amber, letterSpacing:0.5, textTransform:"uppercase", marginBottom:8 }}>Missing items</div>
+                {missing.length>0 && <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>{missing.map(n=>(<span key={n} style={{ background:`${C.amber}12`, color:C.amber, borderRadius:14, padding:"3px 10px", fontSize:11, fontWeight:700 }}>{n}</span>))}</div>}
+                {missingNote.trim() && <div style={{ fontSize:12.5, color:C.ink, lineHeight:1.55, marginTop: missing.length>0?8:0 }}>{missingNote}</div>}
+              </div>
+            )}
+            {issue && issue.key==="ingredient" && (()=>{ const o=compensationOutcome(recipe,bad,issues,missing); return (
+              <div style={{ background:C.white, border:`1px solid ${o.color}55`, borderRadius:14, padding:16, marginBottom:10, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                <div style={{ fontSize:11, fontWeight:800, color:C.gray, letterSpacing:0.5, textTransform:"uppercase", marginBottom:8 }}>Resolution</div>
+                <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+                  <div style={{ width:10, height:10, borderRadius:5, background:o.color, flexShrink:0 }} />
+                  <div style={{ fontSize:15, fontWeight:900, color:o.color }}>{o.label}</div>
+                </div>
+                <div style={{ fontSize:12.5, color:C.ink, lineHeight:1.6, marginTop:8 }}>{o.note}</div>
+                {o.verify && <div style={{ fontSize:11.5, color:C.amber, lineHeight:1.5, marginTop:8 }}>Higher-value credit, so it is confirmed against the supplier batch and may ask for a quick photo.</div>}
+              </div>
+            ); })()}
+            {issue && issue.key!=="ingredient" && ISSUE_CONFIG[issue.key] && (
+              <div style={{ background:C.white, border:`1px solid ${C.line}`, borderRadius:14, padding:16, marginBottom:10, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+                {detail.picks.length>0 && <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>{detail.picks.map(p=>(<span key={p} style={{ background:`${C.green}12`, color:C.green, borderRadius:14, padding:"3px 10px", fontSize:11, fontWeight:700 }}>{p}</span>))}</div>}
+                <div style={{ fontSize:12.5, color:C.ink, lineHeight:1.6 }}>{detail.photo ? "Your photo was attached for faster resolution." : "No photo attached."}{detail.note ? (" Note: "+detail.note) : ""}</div>
+              </div>
+            )}
+            <div style={{ background:C.amberBg, border:`1px solid ${C.amber}44`, borderRadius:14, padding:16, marginTop:6 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:C.amber, letterSpacing:0.5, textTransform:"uppercase", marginBottom:6 }}>What happens next</div>
+              <div style={{ fontSize:13, color:C.black, lineHeight:1.65 }}>{issue && issue.key==="ingredient" ? <>We've sent this to our quality review team to investigate the flagged ingredient{bad.length>1?"s":""} with the supplier.</> : <>We've routed this to the team that owns {ISSUE_CONFIG[issue&&issue.key] ? ISSUE_CONFIG[issue.key].team : "this area"}, with your photo and details.</>} You'll hear back with the outcome within 3 to 5 business days.</div>
+            </div>
+            <button onClick={reset} style={{ width:"100%", marginTop:16, background:C.green, color:"white", border:"none", borderRadius:14, padding:"15px 0", fontSize:15, fontWeight:900, cursor:"pointer" }}>Done</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Supplier scorecard: report → batch → quality standard for producers ── */
+const TIERS = [
+  { name:"Meets standard", color:C.green, bg:"#EAF4E5",
+    action:"Batch is within the ≤ 2% acceptable defect rate. Keep sourcing as normal." },
+  { name:"On watch", color:C.amber, bg:C.amberBg,
+    action:"Defect rate above standard. Auto-flagged in Intelex, supplier notified, next 2 batches monitored." },
+  { name:"Corrective action required", color:C.orange, bg:"#FCEBDD",
+    action:"An Intelex corrective action is opened. Supplier must submit a root-cause analysis and fix before the next batch ships." },
+  { name:"Re-source / replace supplier", color:C.red, bg:"#FBEDE7",
+    action:"Repeated breach of the standard. Procurement sources an alternate provider for this ingredient." },
+];
+const OTHER_SUPPLIERS = [
+  { ing:"Salmon Fillet", emoji:"🐟", supplier:"Northern Waters Seafood, BC", rate:1.3 },
+  { ing:"Bell Pepper", emoji:"🫑", supplier:"Sunrise Organics, Ontario", rate:2.7 },
+  { ing:"Thai Basil", emoji:"🌿", supplier:"Greenleaf Farms, Quebec", rate:4.9 },
+  { ing:"Cremini Mushrooms", emoji:"🍄", supplier:"Forest Floor Fungi, Ontario", rate:1.8 },
+];
+function rateToTier(r){ return r<=2 ? 0 : r<=4 ? 1 : r<=7 ? 2 : 3; }
+function rateToScore(r){ return Math.max(0, Math.round(100 - Math.max(0, r-2)*9)); }
+function MiniStatus({rate}){
+  const t = TIERS[rateToTier(rate)];
+  return <span style={{ background:t.bg, color:t.color, borderRadius:20, padding:"3px 10px", fontSize:11, fontWeight:800, whiteSpace:"nowrap" }}>{t.name}</span>;
+}
+function OpsScorecard(){
+  const [rate,setRate] = useState(6.2);
+  const BATCH = 9200;
+  const tierIdx = rateToTier(rate);
+  const tier = TIERS[tierIdx];
+  const score = rateToScore(rate);
+  const affected = Math.round(BATCH*rate/100);
+  const Step = ({i})=>{
+    const active = i===tierIdx, passed = i<tierIdx;
+    const t = TIERS[i];
+    return (
+      <div style={{ display:"flex", gap:12, alignItems:"flex-start", opacity: active||passed?1:0.45 }}>
+        <div style={{ width:26, height:26, borderRadius:13, flexShrink:0, background: active?t.color:(passed?C.grayLight:"transparent"), border:`2px solid ${active?t.color:C.grayLight}`, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:900 }}>{passed?"✓":i+1}</div>
+        <div style={{ paddingBottom:14 }}>
+          <div style={{ fontSize:13.5, fontWeight:800, color: active?t.color:C.ink }}>{t.name}{active && <span style={{ marginLeft:8, fontSize:11, background:t.bg, color:t.color, borderRadius:10, padding:"2px 8px" }}>current</span>}</div>
+          {active && <div style={{ fontSize:12.5, color:C.gray, lineHeight:1.55, marginTop:4 }}>{t.action}</div>}
+        </div>
+      </div>
+    );
+  };
+  return (
+    <div style={{ maxWidth:1000, margin:"0 auto" }}>
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
+        {[
+          ["📱","Subscriber reports","Per-ingredient, tagged, with supplier"],
+          ["📊","Aggregate by batch","Defect rate per supplier per ingredient"],
+          ["🎯","Score vs. standard","Auto-graded against the ≤ 2% threshold"],
+          ["⚙️","Trigger action","Watch → corrective → re-source"],
+        ].map((s,i)=>(
+          <div key={i} style={{ flex:"1 1 180px", background:C.white, border:`1px solid ${C.line}`, borderRadius:12, padding:"12px 14px" }}>
+            <div style={{ fontSize:22 }}>{s[0]}</div>
+            <div style={{ fontSize:13, fontWeight:800, marginTop:4, color:C.ink }}>{i+1}. {s[1]}</div>
+            <div style={{ fontSize:11.5, color:C.gray, marginTop:2, lineHeight:1.4 }}>{s[2]}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:16 }}>
+        <div style={{ background:C.white, borderRadius:16, padding:20, boxShadow:"0 2px 12px rgba(0,0,0,.08)", border:`1px solid ${C.line}` }}>
+          <div style={{ fontSize:11, fontWeight:800, color:C.gray, letterSpacing:.5, textTransform:"uppercase" }}>Live batch · simulate complaint volume</div>
+          <div style={{ display:"flex", alignItems:"center", gap:11, margin:"12px 0 4px" }}>
+            <div style={{ width:44, height:44, borderRadius:11, background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>🍗</div>
+            <div>
+              <div style={{ fontSize:15, fontWeight:900, color:C.ink }}>Chicken Breast</div>
+              <div style={{ fontSize:12, color:C.gray }}>Maplebrook Poultry, Ontario · batch #MP-2291</div>
+            </div>
+          </div>
+          <div style={{ fontSize:12.5, color:C.gray, marginTop:10, marginBottom:6 }}>Reported quality-defect rate this batch</div>
+          <input type="range" min="0" max="12" step="0.1" value={rate} onChange={e=>setRate(parseFloat(e.target.value))} style={{ width:"100%", accentColor:tier.color }} />
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginTop:4 }}>
+            <div style={{ fontSize:30, fontWeight:900, color:tier.color }}>{rate.toFixed(1)}%</div>
+            <div style={{ fontSize:11.5, color:C.gray }}>standard: ≤ 2.0%</div>
+          </div>
+          <div style={{ marginTop:14 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:C.gray, marginBottom:4 }}><span>Supplier quality score</span><span style={{ fontWeight:900, color:tier.color }}>{score}/100</span></div>
+            <div style={{ height:10, borderRadius:6, background:C.bg, overflow:"hidden" }}>
+              <div style={{ height:"100%", width:`${score}%`, background:tier.color, transition:"all .2s" }} />
+            </div>
+          </div>
+          <div style={{ marginTop:14, background:tier.bg, borderRadius:12, padding:"12px 14px" }}><MiniStatus rate={rate}/></div>
+        </div>
+        <div style={{ background:C.white, borderRadius:16, padding:20, boxShadow:"0 2px 12px rgba(0,0,0,.08)", border:`1px solid ${C.line}` }}>
+          <div style={{ fontSize:11, fontWeight:800, color:C.gray, letterSpacing:.5, textTransform:"uppercase", marginBottom:14 }}>Automated action ladder</div>
+          {[0,1,2,3].map(i=><Step key={i} i={i}/>)}
+        </div>
+      </div>
+      <div style={{ background:tier.bg, border:`1px solid ${tier.color}44`, borderRadius:16, padding:"16px 20px", marginTop:16 }}>
+        <div style={{ fontSize:12, fontWeight:800, color:tier.color, letterSpacing:.5, textTransform:"uppercase", marginBottom:6 }}>Impact on this batch</div>
+        <div style={{ fontSize:14, color:C.ink, lineHeight:1.7 }}>
+          At <strong>{rate.toFixed(1)}%</strong>, roughly <strong>{affected.toLocaleString()}</strong> of the {BATCH.toLocaleString()} boxes in this batch contained a chicken breast outside the freshness standard. {tierIdx>=2
+            ? <>The system triggers a fix at the source: <strong>{tierIdx===3?"re-source to a provider who can hold the standard":"a corrective action the supplier must close before shipping again"}</strong>.</>
+            : <>Within tolerance. Logged and tracked, not yet a systemic batch problem.</>}
+        </div>
+      </div>
+      <div style={{ background:C.white, borderRadius:16, marginTop:16, overflow:"hidden", boxShadow:"0 2px 12px rgba(0,0,0,.08)", border:`1px solid ${C.line}` }}>
+        <div style={{ fontSize:11, fontWeight:800, color:C.gray, letterSpacing:.5, textTransform:"uppercase", padding:"14px 16px 6px" }}>This week · flagged ingredients by supplier</div>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+          <tbody>
+            {[{ing:"Chicken Breast",emoji:"🍗",supplier:"Maplebrook Poultry, Ontario",rate:rate},...OTHER_SUPPLIERS]
+              .sort((a,b)=>b.rate-a.rate)
+              .map((s,i)=>(
+              <tr key={i} style={{ borderTop:`1px solid ${C.line}` }}>
+                <td style={{ padding:"11px 16px", width:36 }}>{s.emoji}</td>
+                <td style={{ padding:"11px 6px" }}>
+                  <div style={{ fontWeight:800, color:C.ink }}>{s.ing}</div>
+                  <div style={{ fontSize:11.5, color:C.gray }}>{s.supplier}</div>
+                </td>
+                <td style={{ padding:"11px 6px", textAlign:"right", fontWeight:900, color:TIERS[rateToTier(s.rate)].color }}>{s.rate.toFixed(1)}%</td>
+                <td style={{ padding:"11px 16px", textAlign:"right" }}><MiniStatus rate={s.rate}/></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════ PAGE: case study narrative ════════════════ */
+const CMP_ROWS = [
+  ["Entry point", "Contact Customer Care via phone / chat / email. No in-app flow for the item.", "One tap from the meal screen opens the report flow."],
+  ["Issue detail", "Free-text ticket interpreted by an agent.", "5 structured issue types + 6 problem tags per ingredient."],
+  ["Ingredient specificity", "None. Reported at the box level.", "Per-ingredient, multi-select, from the real ingredient list."],
+  ["Supplier traceability", "None reaches a supplier batch.", "Each report mapped to its supplier batch and scored."],
+  ["Acknowledgement", "May or may not hear back.", "Instant confirmation: ingredient, supplier, routed for review."],
+  ["Effort / time", "6+ steps, leaves the app, photo by email, 5 to 7 day window.", "~5 taps, fully in-app, about 30 seconds."],
+  ["Eligibility", "Covered only when HelloFresh is at fault (missing, spoiled, wrong, unsafe-late). Taste or a missed cutoff are not covered.", "Captures every quality signal, including the ~90% that never become a formal claim."],
+  ["Proof & window", "Report within 7 days with timestamped photos; an agent can still deny the claim.", "One tap at the moment of feedback, with no photo gate just to be heard."],
+  ["Outcome & speed", "Account credit (posts fast) or card refund in 5 to 10 days; denials and slow credits are common.", "Acknowledgement and routing now; structured data feeds a fairer future credit model."],
+];
+const PROBLEM_POINTS = [
+  ["Quality declines quietly", "Ingredient freshness, portion size, deliveries and damage slip, and the subscriber has no trusted, easy channel to flag it."],
+  ["Feedback is generic", "Recipe ratings capture meal sentiment, and complaints become a free-text support ticket. Neither says which ingredient or supplier failed."],
+  ["The signal never reaches the source", "An individual complaint is not linked to a supplier batch, so the same issues recur and trust erodes."],
+  ["Most of it is invisible", "~90% of quality dissatisfaction is never reported. The highest-value subscribers skip, then cancel, silently."],
+];
+const PILLARS = [
+  ["🎯","Pinpoints the exact batch", "Every report maps to the supplier batch it came from. That lets HelloFresh hold each producer to a measurable quality standard and act when a batch breaches it, shown in the Supplier Scorecard below."],
+  ["🏷️","Tailored, not generic", "Structured issue types and per-ingredient problem tags produce clean, machine-readable signal: exactly what failed and where, instead of a vague ticket an agent has to interpret."],
+  ["⚡","Easier for the user", "One tap, in-app, about 30 seconds, versus 6+ steps, leaving the app to email a photo, inside a 5 to 7 day window. Lower friction means far more issues actually get reported."],
+];
+
+/* ── AI review: validates requests + photos, replaces the agent queue ── */
+const AI_DECISIONS = {
+  full:     { label:"Approve full meal credit",  color:C.green },
+  micro:    { label:"Approve micro-credit",       color:C.greenMid },
+  escalate: { label:"Level 2 review required (Operations team)", color:C.amber },
+  fraud:    { label:"Flag as duplicate / fraud",  color:C.red },
+};
+const AI_REQUESTS = [
+  { id:"#48217", recipe:"Thai Basil Chicken", item:"Chicken Breast (critical)", claim:"Spoiled / moldy", supplier:"Maplebrook Poultry · batch MP-2291", photo:true, confidence:96, corrob:4, decision:"full",
+    reportText:"Chicken breast smelled off with grey patches, I couldn't cook it.",
+    context:"The text, the spoiled tag and the photo all describe the same spoilage of a meal-defining protein, and four other subscribers flagged the same batch this week. The signals agree.",
+    protocol:"Protocol FQ-12: a spoiled critical ingredient that makes the dish uncookable maps to a full meal credit.",
+    profile:{ reports:3, window:"12 months", genuine:3, flagged:0, trust:"Low risk", note:"3 reports in 12 months, all validated. Long-tenured, consistent history." } },
+  { id:"#48216", recipe:"Honey Garlic Salmon", item:"Broccoli (supporting)", claim:"Wilted / soft", supplier:"Valley Fresh Produce, BC", photo:true, confidence:88, corrob:1, decision:"micro",
+    reportText:"Broccoli was a bit limp but I still cooked with it.",
+    context:"Text and photo agree on mild wilting of a supporting item, and the customer confirms the dish was still cookable. Low severity, signals consistent.",
+    protocol:"Protocol FQ-04: minor degradation of a supporting ingredient maps to a micro-credit.",
+    profile:{ reports:1, window:"12 months", genuine:1, flagged:0, trust:"Low risk", note:"First report this year, no prior flags." } },
+  { id:"#48215", recipe:"Mushroom & Herb Risotto", item:"Arborio Rice (critical)", claim:"Wrong / missing", supplier:"Pantry Staples Co.", photo:false, confidence:54, corrob:0, decision:"escalate",
+    reportText:"The risotto rice just wasn't in the box at all.",
+    context:"The claim is plausible, but there is no photo and no other reports on this batch, so the missing item cannot be confirmed from the evidence.",
+    protocol:"No protocol can be applied with confidence; the evidence is insufficient to auto-decide.",
+    profile:{ reports:2, window:"12 months", genuine:1, flagged:1, trust:"Watch", note:"2 prior reports; one had no photo and was inconclusive." } },
+  { id:"#48214", recipe:"Thai Basil Chicken", item:"Chicken Breast (critical)", claim:"Spoiled / moldy", supplier:"Maplebrook Poultry · batch MP-2291", photo:true, confidence:12, corrob:0, decision:"fraud",
+    reportText:"Chicken was completely rotten, I want a full refund now.",
+    context:"The photo is a reused stock image already submitted on three other accounts, and the history shows repeated flagged claims. The evidence contradicts the text.",
+    protocol:"Manipulation pattern detected; no auto-credit. Routed for a manual decision.",
+    profile:{ reports:9, window:"3 months", genuine:2, flagged:4, trust:"High risk", note:"9 claims in 3 months, 4 previously flagged as unverified. Pattern suggests credit-seeking." } },
+];
+function AIReview(){
+  const [sel,setSel] = useState(0);
+  const r = AI_REQUESTS[sel];
+  const d = AI_DECISIONS[r.decision];
+  const tc = r.profile.trust==="High risk"?C.red:(r.profile.trust==="Watch"?C.amber:C.green);
+  return (
+    <div style={{ maxWidth:1000, margin:"0 auto" }}>
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:16 }}>
+        {[["86%","auto-resolved by AI"],["2 min","median review"],["14%","Level 2 review"],["0","hold queue"]].map((s,i)=>(
+          <div key={i} style={{ flex:"1 1 150px", background:C.white, border:`1px solid ${C.line}`, borderRadius:12, padding:"12px 14px" }}>
+            <div style={{ fontSize:22, fontWeight:900, color:C.green }}>{s[0]}</div>
+            <div style={{ fontSize:11.5, color:C.gray, marginTop:2 }}>{s[1]}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize:13, color:"rgba(255,255,255,.7)", marginBottom:14, maxWidth:840, lineHeight:1.6 }}>An AI reviewer replaces the support-agent queue for the first pass. It reads the whole report together, the text, the structured tags, the photo, the corroboration across tickets and the reporting history, to understand and validate the context, then applies established credit protocols to decide. When it does not have enough information, it routes the request to a Level 2 review by the Operations team. Tap a request to see the reasoning.</div>
+      <div style={{ display:"grid", gridTemplateColumns:"minmax(220px,290px) 1fr", gap:16 }}>
+        <div>
+          {AI_REQUESTS.map((q,i)=>{ const dd=AI_DECISIONS[q.decision]; const on=i===sel; return (
+            <div key={q.id} onClick={()=>setSel(i)} style={{ background:on?C.white:"rgba(255,255,255,0.06)", border:`1px solid ${on?dd.color:"rgba(255,255,255,0.14)"}`, borderRadius:12, padding:"12px 14px", marginBottom:10, cursor:"pointer" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ fontSize:12, fontWeight:800, color:on?C.ink:"#fff" }}>{q.id}</span>
+                <span style={{ width:9, height:9, borderRadius:5, background:dd.color, display:"inline-block" }} />
+              </div>
+              <div style={{ fontSize:12, color:on?C.gray:"rgba(255,255,255,.7)", marginTop:3 }}>{q.item}</div>
+              <div style={{ fontSize:11.5, color:on?dd.color:"rgba(255,255,255,.5)", marginTop:2, fontWeight:700 }}>{q.claim}{q.photo?" · 📷":" · no photo"}</div>
+            </div>
+          ); })}
+        </div>
+        <div style={{ background:C.white, borderRadius:16, padding:20, border:`1px solid ${C.line}` }}>
+          <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
+            <div>
+              <div style={{ fontSize:16, fontWeight:900, color:C.ink }}>{r.recipe} · {r.id}</div>
+              <div style={{ fontSize:12.5, color:C.gray }}>{r.item} · {r.supplier}</div>
+            </div>
+            <div style={{ fontSize:12, color:C.gray }}>Claim: <strong style={{color:C.red}}>{r.claim}</strong></div>
+          </div>
+          <div style={{ background:C.bg, borderRadius:12, padding:"12px 14px", marginTop:16 }}>
+            <div style={{ fontSize:11, fontWeight:800, color:C.gray, letterSpacing:.4, textTransform:"uppercase", marginBottom:8 }}>1 · Report intake</div>
+            <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
+              <div style={{ width:92, height:92, borderRadius:12, background:r.photo?C.white:"#F3EFE8", border:`1.5px dashed ${C.grayLight}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, flexShrink:0 }}>{r.photo?"🖼️":"🚫"}</div>
+              <div style={{ flex:1, minWidth:200, fontSize:12.5, color:C.ink, lineHeight:1.6 }}>
+                <div><strong>Text:</strong> "{r.reportText}"</div>
+                <div style={{ marginTop:4 }}><strong>Tags:</strong> {r.claim} · {r.item}</div>
+                <div style={{ marginTop:4 }}><strong>Photo:</strong> {r.photo ? "attached" : "not provided"} · <strong>Corroboration:</strong> {r.corrob>0 ? (r.corrob+" matching report"+(r.corrob>1?"s":"")+" on this batch") : "none"}</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ background:C.bg, borderRadius:12, padding:"12px 14px", marginTop:14 }}>
+            <div style={{ fontSize:11, fontWeight:800, color:C.gray, letterSpacing:.4, textTransform:"uppercase", marginBottom:6 }}>2 · Context understanding & validation</div>
+            <div style={{ fontSize:13, color:C.ink, lineHeight:1.6 }}>{r.context}</div>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:C.gray, margin:"12px 0 4px" }}><span>Validation confidence</span><span style={{ fontWeight:900, color:d.color }}>{r.confidence}%</span></div>
+            <div style={{ height:8, borderRadius:5, background:C.white, overflow:"hidden" }}><div style={{ height:"100%", width:r.confidence+"%", background:d.color }} /></div>
+          </div>
+          <div style={{ background:C.bg, borderRadius:12, padding:"12px 14px", marginTop:14 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:7 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:C.gray, letterSpacing:.4, textTransform:"uppercase" }}>3 · User profile analysis</div>
+              <span style={{ background:`${tc}18`, color:tc, borderRadius:20, padding:"2px 10px", fontSize:11, fontWeight:800 }}>{r.profile.trust}</span>
+            </div>
+            <div style={{ display:"flex", gap:14, fontSize:12, color:C.ink, marginBottom:6, flexWrap:"wrap" }}>
+              <span><strong>{r.profile.reports}</strong> reports / {r.profile.window}</span>
+              <span style={{color:C.green}}><strong>{r.profile.genuine}</strong> validated</span>
+              <span style={{color:C.red}}><strong>{r.profile.flagged}</strong> flagged</span>
+            </div>
+            <div style={{ fontSize:12.5, color:C.gray, lineHeight:1.55 }}>{r.profile.note}</div>
+          </div>
+          <div style={{ background:C.bg, borderRadius:12, padding:"12px 14px", marginTop:14 }}>
+            <div style={{ fontSize:11, fontWeight:800, color:C.gray, letterSpacing:.4, textTransform:"uppercase", marginBottom:6 }}>4 · Protocol applied</div>
+            <div style={{ fontSize:13, color:C.ink, lineHeight:1.6 }}>{r.protocol}</div>
+          </div>
+          <div style={{ background:`${d.color}10`, border:`1px solid ${d.color}55`, borderRadius:12, padding:"14px 16px", marginTop:14 }}>
+            <div style={{ fontSize:11, fontWeight:800, color:C.gray, letterSpacing:.4, textTransform:"uppercase", marginBottom:6 }}>Decision</div>
+            <div style={{ fontSize:16, fontWeight:900, color:d.color }}>{r.decision==="escalate" ? "Not enough information \u2192 Level 2 review" : d.label}</div>
+            {(r.decision==="escalate"||r.decision==="fraud") && <div style={{ fontSize:12, color:C.gray, marginTop:6, lineHeight:1.5 }}>Routed to the Operations team for a manual decision.</div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Ops metrics: thousands of tickets rolled up for the business ── */
+function OpsMetrics(){
+  const batches=[["Mar",6.2],["Apr",4.8],["May",3.1],["Jun",2.0]];
+  const maxb=7;
+  const comp=[["Micro-credit",58,C.greenMid],["Partial credit",17,C.amber],["Full meal credit",15,C.green],["No credit (logged)",10,C.gray]];
+  return (
+    <div style={{ maxWidth:1000, margin:"0 auto" }}>
+      <div style={{ fontSize:13, color:"rgba(255,255,255,.7)", marginBottom:16, maxWidth:860, lineHeight:1.6 }}>The same structured reports, aggregated across thousands of tickets, become an operations view: where quality is trending, what compensation costs, and whether payouts are fair. Figures are illustrative.</div>
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:18 }}>
+        {[["12,480","tickets / month"],["86%","auto-resolved by AI"],["2 min","median resolution"],["~24%","projected credit savings"]].map((s,i)=>(
+          <div key={i} style={{ flex:"1 1 150px", background:C.white, border:`1px solid ${C.line}`, borderRadius:12, padding:"14px 16px" }}>
+            <div style={{ fontSize:24, fontWeight:900, color:C.green }}>{s[0]}</div>
+            <div style={{ fontSize:11.5, color:C.gray, marginTop:2 }}>{s[1]}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:16 }}>
+        <div style={{ background:C.white, borderRadius:16, padding:20, border:`1px solid ${C.line}` }}>
+          <div style={{ fontSize:13, fontWeight:900, color:C.ink }}>Batch defect rate · Maplebrook Poultry</div>
+          <div style={{ fontSize:11.5, color:C.gray, marginBottom:14 }}>After corrective action triggered by reports</div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:16, height:130 }}>
+            {batches.map((b,i)=>{ const hh=Math.round(b[1]/maxb*110); const ok=b[1]<=2; return (
+              <div key={i} style={{ flex:1, textAlign:"center" }}>
+                <div style={{ fontSize:12, fontWeight:800, color:ok?C.green:C.amber, marginBottom:4 }}>{b[1]}%</div>
+                <div style={{ height:hh, borderRadius:"6px 6px 0 0", background:ok?C.green:C.amber }} />
+                <div style={{ fontSize:11, color:C.gray, marginTop:6 }}>{b[0]}</div>
+              </div>
+            ); })}
+          </div>
+          <div style={{ fontSize:11.5, color:C.gray, marginTop:10 }}>Standard: ≤ 2%. Reached by June.</div>
+        </div>
+        <div style={{ background:C.white, borderRadius:16, padding:20, border:`1px solid ${C.line}` }}>
+          <div style={{ fontSize:13, fontWeight:900, color:C.ink }}>How compensation is distributed</div>
+          <div style={{ fontSize:11.5, color:C.gray, marginBottom:14 }}>Payout matched to AI-validated severity</div>
+          {comp.map((c,i)=>(
+            <div key={i} style={{ marginBottom:11 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:C.ink, marginBottom:3 }}><span>{c[0]}</span><span style={{ fontWeight:800 }}>{c[1]}%</span></div>
+              <div style={{ height:8, borderRadius:5, background:C.bg, overflow:"hidden" }}><div style={{ height:"100%", width:c[1]+"%", background:c[2] }} /></div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ background:C.white, borderRadius:16, padding:20, border:`1px solid ${C.line}`, marginTop:16 }}>
+        <div style={{ fontSize:13, fontWeight:900, color:C.ink, marginBottom:4 }}>Credit spend vs the current flat model</div>
+        <div style={{ fontSize:12.5, color:C.gray, lineHeight:1.6, marginBottom:14 }}>Matching payout to severity and shifting cost to at-fault suppliers reduces outlay. Short term, spend can rise as more genuine issues surface; the saving is a medium-term effect.</div>
+        <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
+          <div style={{ flex:"1 1 200px" }}>
+            <div style={{ fontSize:11.5, color:C.gray, marginBottom:6 }}>Flat model (today)</div>
+            <div style={{ height:26, borderRadius:6, background:C.amber, display:"flex", alignItems:"center", paddingLeft:10, color:"#fff", fontWeight:800, fontSize:12.5 }}>100% baseline</div>
+          </div>
+          <div style={{ flex:"1 1 200px" }}>
+            <div style={{ fontSize:11.5, color:C.gray, marginBottom:6 }}>Severity-matched + supplier recovery</div>
+            <div style={{ height:26, width:"76%", borderRadius:6, background:C.green, display:"flex", alignItems:"center", paddingLeft:10, color:"#fff", fontWeight:800, fontSize:12.5 }}>~76% target</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Tier2Review(){
+  const flagged = AI_REQUESTS.filter(q=> q.decision==="escalate" || q.decision==="fraud");
+  return (
+    <div style={{ maxWidth:1000, margin:"0 auto" }}>
+      {flagged.map(q=>{ const dd=AI_DECISIONS[q.decision]; const tc = q.profile.trust==="High risk"?C.red:(q.profile.trust==="Watch"?C.amber:C.green); return (
+        <div key={q.id} style={{ background:C.white, border:`1px solid ${C.line}`, borderRadius:14, padding:16, marginBottom:12 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:8, alignItems:"center" }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:900, color:C.ink }}>{q.id} · {q.recipe}</div>
+              <div style={{ fontSize:12, color:C.gray }}>{q.item} · {q.claim}</div>
+            </div>
+            <span style={{ background:`${dd.color}14`, color:dd.color, borderRadius:20, padding:"3px 12px", fontSize:11.5, fontWeight:800 }}>Flagged: {q.decision==="fraud"?"possible manipulation":"needs verification"}</span>
+          </div>
+          <div style={{ fontSize:12.5, color:C.gray, lineHeight:1.55, marginTop:8 }}>Why the AI flagged it: {q.verdict} Trust: <strong style={{color:tc}}>{q.profile.trust}</strong> ({q.profile.flagged} prior flags).</div>
+          <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
+            <button style={{ border:"none", background:C.green, color:"#fff", borderRadius:10, padding:"8px 14px", fontSize:12.5, fontWeight:800, cursor:"pointer" }}>Approve credit</button>
+            <button style={{ border:`1px solid ${C.line}`, background:C.white, color:C.ink, borderRadius:10, padding:"8px 14px", fontSize:12.5, fontWeight:800, cursor:"pointer" }}>Request more info</button>
+            <button style={{ border:`1px solid ${C.red}55`, background:`${C.red}0E`, color:C.red, borderRadius:10, padding:"8px 14px", fontSize:12.5, fontWeight:800, cursor:"pointer" }}>Deny</button>
+          </div>
+        </div>
+      ); })}
+    </div>
+  );
+}
+function Nav({page,setPage}){
+  const items=[["home","Home"],["customer","Customer experience"],["back","Back end operations"]];
+  return (
+    <div style={{ position:"sticky", top:0, zIndex:100, background:"#0F3A1C", borderBottom:"1px solid rgba(255,255,255,0.12)" }}>
+      <div style={{ maxWidth:1180, margin:"0 auto", padding:"0 16px", display:"flex", alignItems:"center", gap:4, minHeight:54, flexWrap:"wrap" }}>
+        <div style={{ color:C.lime, fontWeight:900, fontSize:14, marginRight:12 }}>Quality Intelligence</div>
+        {items.map((it,i)=>(
+          <button key={it[0]} onClick={()=>{ setPage(it[0]); if(typeof window!=="undefined") window.scrollTo(0,0); }} style={{ border:"none", cursor:"pointer", background: page===it[0]?"rgba(141,198,63,.2)":"transparent", color: page===it[0]?C.lime:"rgba(255,255,255,.82)", fontWeight:800, fontSize:13, padding:"8px 12px", borderRadius:8 }}>{i+1}. {it[1]}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+function App(){
+  const [view,setView] = useState("both");
+  const [page,setPage] = useState("home");
+  const Tab = ({id,label})=>(
+    <button onClick={()=>setView(id)} style={{ border:"none", cursor:"pointer", borderRadius:11, padding:"9px 16px", fontSize:13, fontWeight:800,
+      background: view===id ? C.lime : "rgba(255,255,255,0.12)", color: view===id ? "#10260f" : "rgba(255,255,255,.85)", transition:"all .15s" }}>{label}</button>
+  );
+  const H2 = ({children})=> <h2 style={{ fontSize:22, color:C.green, margin:"0 0 6px" }}>{children}</h2>;
+  const Lead = ({children})=> <p style={{ color:C.gray, fontSize:14, margin:"0 0 22px", lineHeight:1.6, maxWidth:780 }}>{children}</p>;
+
+  return (
+    <div>
+      <Nav page={page} setPage={setPage}/>
+      {page==="home" && (<>
+      {/* HERO */}
+      <div style={{ background:`linear-gradient(150deg, ${C.green} 0%, #0F3A1C 100%)`, color:"#fff", padding:"46px 20px 38px" }}>
+        <div style={{ maxWidth:1180, margin:"0 auto" }}>
+          <div style={{ color:C.lime, fontWeight:800, letterSpacing:1, textTransform:"uppercase", fontSize:11.5, marginBottom:10 }}>Hello PM · Batch 51 · George Innasi · Case Study</div>
+          <h1 style={{ margin:"0 0 12px", fontSize:30, lineHeight:1.15 }}>Proactive Quality Intelligence for HelloFresh</h1>
+          <p style={{ margin:0, color:"rgba(255,255,255,.85)", fontSize:15, lineHeight:1.6, maxWidth:820 }}>
+            A product concept that explores how structured customer feedback could help HelloFresh identify quality issues earlier, improve supplier accountability, and strengthen subscriber trust.
+          </p>
+        </div>
+      </div>
+
+      {/* THESIS */}
+      <div style={{ background:"#10260f", padding:"28px 20px" }}>
+        <div style={{ maxWidth:1180, margin:"0 auto", display:"flex", gap:14, alignItems:"flex-start" }}>
+          <div style={{ color:C.lime, fontSize:40, lineHeight:.8, fontWeight:900, flexShrink:0 }}>&ldquo;</div>
+          <div>
+            <div style={{ color:"#fff", fontSize:21, fontWeight:900, lineHeight:1.4, maxWidth:900 }}>Customer complaints are an untapped source of operational intelligence.</div>
+            <div style={{ color:"rgba(255,255,255,.5)", fontSize:13, marginTop:8 }}>The idea this case study is built around.</div>
+          </div>
+        </div>
+      </div>
+
+      {/* PROBLEM */}
+      <div style={{ background:C.bg, padding:"40px 0 8px" }}>
+        <div className="pageWrap">
+          <div style={{ display:"inline-block", background:"#FBEDE7", color:C.red, fontWeight:800, fontSize:11, letterSpacing:.6, textTransform:"uppercase", borderRadius:20, padding:"4px 12px", marginBottom:12 }}>The problem</div>
+          <H2>Subscribers churn silently when quality slips</H2>
+          <Toggle title="The problem in detail">Repeated quality issues such as damaged ingredients, missing items, and poor produce quality can gradually erode customer trust. However, the current feedback experience appears fragmented and generates limited operational insight, making it difficult to identify and address recurring problems before customers begin skipping deliveries or canceling their subscriptions.</Toggle>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", columnGap:14 }}>
+            {PROBLEM_POINTS.map((p,i)=>(<Toggle key={i} title={p[0]}>{p[1]}</Toggle>))}
+          </div>
+        </div>
+      </div>
+
+      {/* PHASE 2 EVIDENCE */}
+      <div style={{ background:C.bg, padding:"4px 0 38px" }}>
+        <div className="pageWrap">
+          <div style={{ display:"inline-block", background:"rgba(30,92,46,.1)", color:C.green, fontWeight:800, fontSize:11, letterSpacing:.6, textTransform:"uppercase", borderRadius:20, padding:"4px 12px", marginBottom:12 }}>Research</div>
+          <Toggle title="About this research">Through surveys, community discussions, and secondary research, I explored the drivers of dissatisfaction among current and former HelloFresh customers. Three themes consistently emerged. Basis: 128 survey responses, 17+ Reddit respondents and a couple of direct messages and interviews on r/hellofresh (June 2026), where 43% of the sample were already on a degraded schedule or had left.</Toggle>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", columnGap:14 }}>
+
+            <Toggle title="7+ · ingredient quality and shrinkflation flagged"><strong style={{color:C.green}}>RC1 · quality declines, unverifiable. </strong>Wilted produce, undersized or "shredded" chicken, and wrong or missing items, concentrated in long-tenure subscribers (100 to 247 boxes). One first box arrived missing 40% of its ingredients and got only a $13 credit.</Toggle>
+
+            <Toggle title="5+ · repeated late or damaged deliveries"><strong style={{color:C.amber}}>Phase 2 finding · delivery. </strong>Boxes arriving late or not at all (one courier missed at least one box a month), plus split, squished and leaking boxes and wrong-address drops. Reported across the USA, Australia and the UK, so it is not regional noise.</Toggle>
+
+
+          </div>
+        </div>
+      </div>
+
+      {/* GOAL */}
+      <div style={{ background:C.bg, padding:"34px 0 40px" }}>
+        <div className="pageWrap">
+          <div style={{ background:`linear-gradient(135deg, ${C.green} 0%, ${C.greenMid} 100%)`, borderRadius:18, padding:"26px 26px", color:"#fff" }}>
+            <div style={{ color:C.lime, fontWeight:800, fontSize:11, letterSpacing:.6, textTransform:"uppercase", marginBottom:8 }}>The goal</div>
+            <div style={{ fontSize:20, fontWeight:900, lineHeight:1.4, maxWidth:840 }}>
+              Explore whether a low friction, structured feedback experience could transform customer complaints into actionable operational insights while improving the overall customer experience.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      </>)}
+
+      {page==="customer" && (<>
+      {/* CUSTOMER PROTOTYPE */}
+      <div style={{ background:"#1A3020", padding:"34px 0 10px" }}>
+        <div className="pageWrap">
+          <div style={{ display:"inline-block", background:"rgba(141,198,63,.2)", color:C.lime, fontWeight:800, fontSize:11, letterSpacing:.6, textTransform:"uppercase", borderRadius:20, padding:"4px 12px", marginBottom:12 }}>The customer experience</div>
+          <h2 style={{ fontSize:22, color:"#fff", margin:"0 0 6px" }}>What HelloFresh does today vs. what I propose</h2>
+          <p style={{ color:"rgba(255,255,255,.78)", fontSize:14, margin:"0 0 16px", lineHeight:1.6, maxWidth:820 }}>The customer-facing app. A subscriber reports exactly which ingredient fell short, categorizes the problem, and submits a photo for faster resolution, all without leaving the app.</p>
+          <div style={{ display:"flex", gap:8, marginBottom:24, flexWrap:"wrap" }}>
+            <Tab id="both" label="Side by side"/>
+            <Tab id="today" label="HelloFresh today"/>
+            <Tab id="mine" label="My solution"/>
+          </div>
+          <div className="stage">
+            {(view==="both"||view==="today") && (
+              <div style={{maxWidth:360}}>
+                <div style={{ fontWeight:900, fontSize:15, color:"#fff", marginBottom:10 }}>How HelloFresh handles it today</div>
+                <HelloFreshToday/>
+              </div>
+            )}
+            {(view==="both"||view==="mine") && (
+              <div style={{maxWidth:360}}>
+                <div style={{ fontWeight:900, fontSize:15, color:C.lime, marginBottom:10 }}>My proposed solution</div>
+                <IngredientFeedback/>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div style={{ background:"#1A3020", padding:"24px 0 38px" }}>
+        <div className="pageWrap">
+          <table className="cmp">
+            <thead><tr><th>Dimension</th><th className="bad">HelloFresh today</th><th>My solution</th></tr></thead>
+            <tbody>
+              {CMP_ROWS.map((r,i)=>(
+                <tr key={i}><td className="dim">{r[0]}</td><td className="bad">{r[1]}</td><td className="good">{r[2]}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* CURRENT CREDIT PROCESS */}
+      <div style={{ background:C.bg, padding:"40px 0 8px" }}>
+        <div className="pageWrap">
+          <H2>How getting a credit works today (2026)</H2>
+          <Toggle title="Why this matters">For context, this is the current HelloFresh path for turning a quality issue into money back. It is digital only, documentation gated, and discretionary, which is the experience this concept is measured against.</Toggle>
+          <div style={{ overflow:"hidden", borderRadius:14, border:`1px solid ${C.line}` }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, background:C.white }}>
+              <thead>
+                <tr style={{ background:C.green, color:"#fff" }}>
+                  <th style={{ textAlign:"left", padding:"10px 13px", fontSize:12 }}>If this happened</th>
+                  <th style={{ textAlign:"left", padding:"10px 13px", fontSize:12 }}>Eligible?</th>
+                  <th style={{ textAlign:"left", padding:"10px 13px", fontSize:12 }}>Typical outcome</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Missing item","Yes","Account credit or full refund","good"],
+                  ["Spoiled or damaged food","Yes, with photos","Account credit or partial refund","good"],
+                  ["Wrong meal delivered","Yes","Full credit or refund","good"],
+                  ["Late delivery, food unsafe","Case by case","Account credit or partial refund","mid"],
+                  ["You did not enjoy the meal","No","No refund","bad"],
+                  ["Box not skipped before the cutoff","No","No refund","bad"],
+                ].map((r,i)=>(
+                  <tr key={i} style={{ borderTop:`1px solid ${C.line}` }}>
+                    <td style={{ padding:"10px 13px", fontWeight:700, color:C.ink }}>{r[0]}</td>
+                    <td style={{ padding:"10px 13px", color: r[3]==="bad"?C.red:(r[3]==="mid"?C.amber:C.green), fontWeight:800, whiteSpace:"nowrap" }}>{r[1]}</td>
+                    <td style={{ padding:"10px 13px", color:C.gray }}>{r[2]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ marginTop:14 }}>
+            <Toggle title="The friction in this process"><strong>The friction:</strong> report within 7 days with timestamped photos, through chat, phone, the Help Center form, or email. Credits post quickly, but card refunds take 5 to 10 business days. Denials and slow credits are common, and some claims are marked resolved without the credit ever posting, which pushes users toward chargebacks, the BBB, or Trustpilot (1.3 stars).</Toggle>
+          </div>
+          <div style={{ fontSize:11.5, color:C.gray, marginTop:8 }}>Source: Pine AI, HelloFresh refund policy (March 2026); HelloFresh Help Center.</div>
+        </div>
+      </div>
+
+      {/* COMPENSATION LOGIC */}
+      <div style={{ background:C.bg, padding:"36px 0 8px" }}>
+        <div className="pageWrap">
+          <H2>The proposed compensation logic</H2>
+          <Toggle title="How the compensation logic works">Rather than one flat goodwill credit, the outcome scales with how much the failure actually broke the meal. The subscriber still just taps the bad ingredient; the system decides the tier behind the scenes.</Toggle>
+          <div style={{ display:"grid", gridTemplateColumns:"minmax(96px,130px) 1fr 1fr", gap:10 }}>
+            <div></div>
+            <div style={{ background:C.green, color:"#fff", fontWeight:800, fontSize:12, padding:"10px 12px", borderRadius:10, textAlign:"center" }}>Unusable (missing / spoiled)</div>
+            <div style={{ background:C.green, color:"#fff", fontWeight:800, fontSize:12, padding:"10px 12px", borderRadius:10, textAlign:"center" }}>Degraded but usable</div>
+
+            <div style={{ background:"#EAEFE6", color:C.green, fontWeight:800, fontSize:12.5, padding:"12px", borderRadius:10, display:"flex", alignItems:"center" }}>Critical to the dish</div>
+            <div style={{ background:"#EAF4E5", border:`1px solid ${C.green}33`, borderRadius:10, padding:"12px 14px" }}>
+              <div style={{ fontSize:14, fontWeight:900, color:C.green }}>Full meal credit</div>
+              <div style={{ fontSize:11.5, color:C.gray, marginTop:4, lineHeight:1.5 }}>HelloFresh-style. The dish cannot be cooked, so the whole meal is covered.</div>
+            </div>
+            <div style={{ background:"#FEF3E2", border:`1px solid ${C.amber}33`, borderRadius:10, padding:"12px 14px" }}>
+              <div style={{ fontSize:14, fontWeight:900, color:C.amber }}>Partial credit</div>
+              <div style={{ fontSize:11.5, color:C.gray, marginTop:4, lineHeight:1.5 }}>Key item below standard but still usable.</div>
+            </div>
+
+            <div style={{ background:"#EAEFE6", color:C.green, fontWeight:800, fontSize:12.5, padding:"12px", borderRadius:10, display:"flex", alignItems:"center" }}>Supporting ingredient</div>
+            <div style={{ background:"#EAF4E5", border:`1px solid ${C.greenMid}33`, borderRadius:10, padding:"12px 14px" }}>
+              <div style={{ fontSize:14, fontWeight:900, color:C.greenMid }}>Micro-credit</div>
+              <div style={{ fontSize:11.5, color:C.gray, marginTop:4, lineHeight:1.5 }}>Credited at the ingredient's value; the dish was still cookable.</div>
+            </div>
+            <div style={{ background:"#EFEDE8", border:`1px solid ${C.line}`, borderRadius:10, padding:"12px 14px" }}>
+              <div style={{ fontSize:14, fontWeight:900, color:C.gray }}>Logged, no credit</div>
+              <div style={{ fontSize:11.5, color:C.gray, marginTop:4, lineHeight:1.5 }}>Acknowledged and routed to the right team.</div>
+            </div>
+          </div>
+          <div style={{ marginTop:14 }}>
+            <Toggle title="Escalation and guardrails"><strong>Escalation and guardrails:</strong> if several supporting ingredients fail together, or two or more critical ones, the outcome escalates to a full meal credit. The full-meal tier, the expensive one, is confirmed against the supplier batch and may request a photo, so the cheap path stays frictionless while the costly path stays fraud-resistant. Flag an ingredient in <strong>My solution</strong> above to see the resulting outcome on the confirmation screen.</Toggle>
+          </div>
+        </div>
+      </div>
+
+      {/* WHAT MAKES IT DIFFERENT */}
+      <div style={{ background:C.bg, padding:"40px 0" }}>
+        <div className="pageWrap">
+          <H2>What makes the solution different</H2>
+          <Lead>Three properties turn a complaint into something the business can act on.</Lead>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", columnGap:14 }}>
+            {PILLARS.map((p,i)=>(<Toggle key={i} title={p[0]+"  "+p[1]}>{p[2]}</Toggle>))}
+          </div>
+        </div>
+      </div>
+
+      </>)}
+
+      {page==="back" && (<>
+      {/* BACK END INTRO + TIERS */}
+      <div style={{ background:C.bg, padding:"40px 0 8px" }}>
+        <div className="pageWrap">
+          <div style={{ display:"inline-block", background:"rgba(30,92,46,.1)", color:C.green, fontWeight:800, fontSize:11, letterSpacing:.6, textTransform:"uppercase", borderRadius:20, padding:"4px 12px", marginBottom:12 }}>Back end · operations</div>
+          <H2>Turning reports into accountability and fair credit</H2>
+          <Lead>On the back end, every report and its photo flows through two tiers, and the same data rolls up to hold suppliers and distributors accountable.</Lead>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:16 }}>
+            <div onClick={()=>{ const e=document.getElementById("tier1"); if(e) e.scrollIntoView({behavior:"smooth"}); }} style={{ background:C.white, border:`1px solid ${C.green}44`, borderRadius:16, padding:20, cursor:"pointer" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}><span style={{ background:C.green, color:"#fff", borderRadius:8, padding:"2px 10px", fontSize:12, fontWeight:900 }}>Tier 1</span><span style={{ fontSize:15, fontWeight:900, color:C.green }}>AI triage</span></div>
+              <div style={{ fontSize:13, color:C.ink, lineHeight:1.65 }}>AI validates the photo against the claim, checks corroboration across tickets and the reporting history of the user, then auto-approves clear cases (micro or full credit) and flags the rest. No agent touches a routine claim.</div>
+              <div style={{ fontSize:11.5, fontWeight:800, color:C.green, marginTop:10 }}>View Tier 1 \u2193</div>
+            </div>
+            <div onClick={()=>{ const e=document.getElementById("tier2"); if(e) e.scrollIntoView({behavior:"smooth"}); }} style={{ background:C.white, border:`1px solid ${C.amber}55`, borderRadius:16, padding:20, cursor:"pointer" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}><span style={{ background:C.amber, color:"#fff", borderRadius:8, padding:"2px 10px", fontSize:12, fontWeight:900 }}>Tier 2</span><span style={{ fontSize:15, fontWeight:900, color:C.amber }}>Operations team review</span></div>
+              <div style={{ fontSize:13, color:C.ink, lineHeight:1.65 }}>Only AI-flagged tickets reach a human: missing photos, low confidence, high-risk profiles, or possible manipulation. The Operations team makes the final credit decision on these edge cases.</div>
+              <div style={{ fontSize:11.5, fontWeight:800, color:C.amber, marginTop:10 }}>View Tier 2 \u2193</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* TIER 1 AI REVIEW */}
+      <div id="tier1" style={{ background:"#1A3020", padding:"34px 0 36px", scrollMarginTop:64 }}>
+        <div className="pageWrap">
+          <div style={{ fontWeight:900, fontSize:15, color:C.lime, marginBottom:4 }}>Tier 1 · AI review</div>
+          <p style={{ color:"rgba(255,255,255,.6)", fontSize:13.5, margin:"0 0 18px", lineHeight:1.6, maxWidth:820 }}>Each request is auto-assessed. Anything the AI cannot clear is flagged for a Tier 2 review by the Operations team. Tap a request to see the reasoning.</p>
+          <AIReview/>
+        </div>
+      </div>
+
+      {/* TIER 2 OPERATIONS REVIEW */}
+      <div id="tier2" style={{ background:C.bg, padding:"34px 0 36px", scrollMarginTop:64 }}>
+        <div className="pageWrap">
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}><span style={{ background:C.amber, color:"#fff", borderRadius:8, padding:"2px 10px", fontSize:12, fontWeight:900 }}>Tier 2</span><div style={{ fontWeight:900, fontSize:15, color:C.amber }}>Operations team review</div></div>
+          <p style={{ color:C.gray, fontSize:13.5, margin:"0 0 18px", lineHeight:1.6, maxWidth:820 }}>Only the requests the AI flagged land here. A human reviews the evidence and makes the final credit decision.</p>
+          <Tier2Review/>
+        </div>
+      </div>
+
+      {/* SUPPLIER SCORECARD */}
+      <div style={{ background:C.bg, padding:"8px 0 44px" }}>
+        <div className="pageWrap">
+          <H2>Connecting feedback to supplier performance</H2>
+          <Toggle title="About the supplier scorecard">One opportunity uncovered during this exploration was the possibility of connecting customer feedback directly to supplier performance. The scorecard below illustrates how ingredient level reports could be aggregated into supplier quality signals and used to inform operational decisions. Drag the slider to explore how a single batch could cross the threshold.</Toggle>
+          <OpsScorecard/>
+        </div>
+      </div>
+
+      {/* OPS METRICS */}
+      <div style={{ background:"#1A3020", padding:"12px 0 38px" }}>
+        <div className="pageWrap">
+          <div style={{ fontWeight:900, fontSize:15, color:C.lime, marginBottom:4 }}>Operations metrics</div>
+          <p style={{ color:"rgba(255,255,255,.6)", fontSize:13.5, margin:"0 0 18px", lineHeight:1.6, maxWidth:820 }}>Thousands of these tickets rolled up for the business.</p>
+          <OpsMetrics/>
+        </div>
+      </div>
+
+      {/* BUSINESS CASE */}
+      <div style={{ background:"#1A3020", padding:"42px 0" }}>
+        <div className="pageWrap">
+          <div style={{ display:"inline-block", background:"rgba(141,198,63,.2)", color:C.lime, fontWeight:800, fontSize:11, letterSpacing:.6, textTransform:"uppercase", borderRadius:20, padding:"4px 12px", marginBottom:12 }}>The business case</div>
+          <h2 style={{ fontSize:22, color:"#fff", margin:"0 0 6px" }}>What it costs today, and how this could support retention</h2>
+          <Toggle title="A note on the figures" dark>Figures below are from public research; where HelloFresh does not disclose a number, the estimate and its basis are stated.</Toggle>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", columnGap:14 }}>
+          <Toggle title="The cost of the current model" dark>In 95%+ of cases HelloFresh resolves issues with a discretionary account credit, with no published formula. Quality and service credits are not broken out, but on ~$8.25B revenue an estimated ~1% (<strong>~$80M+ a year</strong>) is a realistic order of magnitude, larger than 2024's near-zero / slightly negative operating margin. Most credits are absorbed, not recovered, because a complaint never reaches the supplier batch.</Toggle>
+          <Toggle title="Who they are losing" dark>Public reviews cluster on three things this solution captures: <strong>quality</strong> (protein and produce freshness), <strong>delivery</strong> (late boxes, melted ice, warm meat), and <strong>damage</strong>. The signal is severe: 1.3★ on Trustpilot and 1,800+ BBB complaints in three years, led by refund denials, slow credits and unresolved issues.</Toggle>
+          <Toggle title="How this could support retention" dark>If implemented successfully, this approach could contribute to improved retention by reducing repeat quality incidents and increasing customer confidence in the feedback process. Cost could also shift toward the at-fault supplier rather than being absorbed as blanket credits.</Toggle>
+          </div>
+        </div>
+      </div>
+
+      </>)}
+      <div style={{ background:C.bg, padding:"22px 0 30px", textAlign:"center", color:C.gray, fontSize:12, lineHeight:1.6 }}>
+        Hello PM Phase 3. George Innasi, June 2026 · Research sources: HelloFresh Help Center, Chattermill, Intelex, Trustpilot, BBB, HelloFresh SE annual reports.
+      </div>
+      <style>{STYLES}</style>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
