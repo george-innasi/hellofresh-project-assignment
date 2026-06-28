@@ -873,7 +873,7 @@ function Tier2Review(){
   );
 }
 function Nav({page,setPage}){
-  const items=[["home","Home"],["customer","Customer experience"],["back","Back end operations"]];
+  const items=[["home","Home"],["customer","Customer experience"],["back","Back end operations"],["impact","How it helps"]];
   return (
     <div style={{ position:"sticky", top:0, zIndex:100, background:"#0F3A1C", borderBottom:"1px solid rgba(255,255,255,0.12)" }}>
       <div style={{ maxWidth:1180, margin:"0 auto", padding:"0 16px", display:"flex", alignItems:"center", gap:4, minHeight:54, flexWrap:"wrap" }}>
@@ -1165,6 +1165,42 @@ function App(){
       </div>
 
       </>)}
+
+      {page==="impact" && (<>
+      {/* IMPACT / HOW IT HELPS */}
+      <div style={{ background:`linear-gradient(150deg, ${C.green} 0%, #0F3A1C 100%)`, color:"#fff", padding:"44px 20px 36px" }}>
+        <div style={{ maxWidth:1180, margin:"0 auto" }}>
+          <div style={{ color:C.lime, fontWeight:800, letterSpacing:1, textTransform:"uppercase", fontSize:11.5, marginBottom:10 }}>Outcome · closing the loop</div>
+          <h1 style={{ margin:"0 0 12px", fontSize:28, lineHeight:1.2 }}>How this solves the problem</h1>
+          <p style={{ margin:0, color:"rgba(255,255,255,.85)", fontSize:15, lineHeight:1.6, maxWidth:860 }}>The case study set out to address <strong>RC1, ingredient quality declines and is unverifiable by the subscriber</strong>. By turning each complaint into structured, supplier-traceable data, the same solution also improves <strong>RC3</strong>, because the value subscribers feel grows when quality is visibly fixed and credits are fair.</p>
+        </div>
+      </div>
+      <div style={{ background:C.bg, padding:"38px 0 50px" }}>
+        <div className="pageWrap">
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:16 }}>
+            {[
+              ["🎯","Directly addresses RC1","Quality that used to decline silently and unverifiably is now reported per ingredient and traced to the supplier batch, so it can be verified and fixed at the source."],
+              ["📈","Also improves RC3","The insights from this data identify the contributors that affect meal quality and let the business act to control them, so subscribers feel the value of what they pay for."],
+              ["🔍","Identifies what drives quality issues","Aggregated reports pinpoint the suppliers, batches and ingredients behind dissatisfaction, triggering corrective operational actions that uphold quality standards."],
+              ["⚡","Makes reporting hassle-free","One tap, in-app, with a photo for faster resolution. It serves exactly the audience that voiced dissatisfaction about ingredient quality, damaged items and missing items."],
+              ["🧾","Accounts for credits and their root causes","Every credit is tied to a validated reason, giving the business a structured way to account for what was given and the root cause behind it."],
+              ["🤖","Tiered triage keeps it efficient","Level 1 AI filters tickets and resolves the clear, definable cases, while complex tickets route to the support team for a final decision."],
+            ].map((d,i)=>(
+              <div key={i} style={{ background:C.white, border:`1px solid ${C.line}`, borderRadius:16, padding:20 }}>
+                <div style={{ fontSize:26 }}>{d[0]}</div>
+                <div style={{ fontSize:15.5, fontWeight:900, color:C.green, margin:"8px 0 8px" }}>{d[1]}</div>
+                <div style={{ fontSize:13, color:C.ink, lineHeight:1.65 }}>{d[2]}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background:`linear-gradient(135deg, ${C.green} 0%, ${C.greenMid} 100%)`, borderRadius:18, padding:"24px 26px", color:"#fff", marginTop:20 }}>
+            <div style={{ color:C.lime, fontWeight:800, fontSize:11, letterSpacing:.6, textTransform:"uppercase", marginBottom:8 }}>In short</div>
+            <div style={{ fontSize:18, fontWeight:900, lineHeight:1.45, maxWidth:880 }}>Customer complaints become operational intelligence: subscribers report quality, delivery and damage in seconds, the business sees the root causes and acts on them, and every credit is fair and accounted for, which protects the trust that keeps subscribers from churning.</div>
+          </div>
+        </div>
+      </div>
+      </>)}
+
       <div style={{ background:C.bg, padding:"22px 0 30px", textAlign:"center", color:C.gray, fontSize:12, lineHeight:1.6 }}>
         Hello PM Phase 3. George Innasi, June 2026 · Research sources: HelloFresh Help Center, Chattermill, Intelex, Trustpilot, BBB, HelloFresh SE annual reports.
       </div>
