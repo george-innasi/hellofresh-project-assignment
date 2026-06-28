@@ -926,7 +926,7 @@ function App(){
         <div className="pageWrap">
           <div style={{ display:"inline-block", background:"#FBEDE7", color:C.red, fontWeight:800, fontSize:11, letterSpacing:.6, textTransform:"uppercase", borderRadius:20, padding:"4px 12px", marginBottom:12 }}>The problem</div>
           <H2>Subscribers churn silently when quality slips</H2>
-          <Toggle title="The problem in detail">Repeated quality issues such as damaged ingredients, missing items, and poor produce quality can gradually erode customer trust. However, the current feedback experience appears fragmented and generates limited operational insight, making it difficult to identify and address recurring problems before customers begin skipping deliveries or canceling their subscriptions.</Toggle>
+          <Lead>Repeated quality issues such as damaged ingredients, missing items, and poor produce quality can gradually erode customer trust. However, the current feedback experience appears fragmented and generates limited operational insight, making it difficult to identify and address recurring problems before customers begin skipping deliveries or canceling their subscriptions.</Lead>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", columnGap:14 }}>
             {PROBLEM_POINTS.map((p,i)=>(<Toggle key={i} title={p[0]}>{p[1]}</Toggle>))}
           </div>
@@ -937,7 +937,7 @@ function App(){
       <div style={{ background:C.bg, padding:"4px 0 38px" }}>
         <div className="pageWrap">
           <div style={{ display:"inline-block", background:"rgba(30,92,46,.1)", color:C.green, fontWeight:800, fontSize:11, letterSpacing:.6, textTransform:"uppercase", borderRadius:20, padding:"4px 12px", marginBottom:12 }}>Research</div>
-          <Toggle title="About this research">Through surveys, community discussions, and secondary research, I explored the drivers of dissatisfaction among current and former HelloFresh customers. Three themes consistently emerged. Basis: 128 survey responses, 17+ Reddit respondents and a couple of direct messages and interviews on r/hellofresh (June 2026), where 43% of the sample were already on a degraded schedule or had left.</Toggle>
+          <Lead>Through surveys, community discussions, and secondary research, I explored the drivers of dissatisfaction among current and former HelloFresh customers. Three themes consistently emerged. Basis: 128 survey responses, 17+ Reddit respondents and a couple of direct messages and interviews on r/hellofresh (June 2026), where 43% of the sample were already on a degraded schedule or had left.</Lead>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", columnGap:14 }}>
 
             <Toggle title="7+ · ingredient quality and shrinkflation flagged"><strong style={{color:C.green}}>RC1 · quality declines, unverifiable. </strong>Wilted produce, undersized or "shredded" chicken, and wrong or missing items, concentrated in long-tenure subscribers (100 to 247 boxes). One first box arrived missing 40% of its ingredients and got only a $13 credit.</Toggle>
@@ -1008,7 +1008,7 @@ function App(){
       <div style={{ background:C.bg, padding:"40px 0 8px" }}>
         <div className="pageWrap">
           <H2>How getting a credit works today (2026)</H2>
-          <Toggle title="Why this matters">For context, this is the current HelloFresh path for turning a quality issue into money back. It is digital only, documentation gated, and discretionary, which is the experience this concept is measured against.</Toggle>
+          <Lead>For context, this is the current HelloFresh path for turning a quality issue into money back. It is digital only, documentation gated, and discretionary, which is the experience this concept is measured against.</Lead>
           <div style={{ overflow:"hidden", borderRadius:14, border:`1px solid ${C.line}` }}>
             <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, background:C.white }}>
               <thead>
@@ -1036,8 +1036,8 @@ function App(){
               </tbody>
             </table>
           </div>
-          <div style={{ marginTop:14 }}>
-            <Toggle title="The friction in this process"><strong>The friction:</strong> report within 7 days with timestamped photos, through chat, phone, the Help Center form, or email. Credits post quickly, but card refunds take 5 to 10 business days. Denials and slow credits are common, and some claims are marked resolved without the credit ever posting, which pushes users toward chargebacks, the BBB, or Trustpilot (1.3 stars).</Toggle>
+          <div style={{ background:C.white, border:`1px solid ${C.line}`, borderRadius:14, padding:"14px 16px", marginTop:14, fontSize:13, color:C.ink, lineHeight:1.65 }}>
+            <strong>The friction:</strong> report within 7 days with timestamped photos, through chat, phone, the Help Center form, or email. Credits post quickly, but card refunds take 5 to 10 business days. Denials and slow credits are common, and some claims are marked resolved without the credit ever posting, which pushes users toward chargebacks, the BBB, or Trustpilot (1.3 stars).
           </div>
           <div style={{ fontSize:11.5, color:C.gray, marginTop:8 }}>Source: Pine AI, HelloFresh refund policy (March 2026); HelloFresh Help Center.</div>
         </div>
@@ -1047,7 +1047,7 @@ function App(){
       <div style={{ background:C.bg, padding:"36px 0 8px" }}>
         <div className="pageWrap">
           <H2>The proposed compensation logic</H2>
-          <Toggle title="How the compensation logic works">Rather than one flat goodwill credit, the outcome scales with how much the failure actually broke the meal. The subscriber still just taps the bad ingredient; the system decides the tier behind the scenes.</Toggle>
+          <Lead>Rather than one flat goodwill credit, the outcome scales with how much the failure actually broke the meal. The subscriber still just taps the bad ingredient; the system decides the tier behind the scenes.</Lead>
           <div style={{ display:"grid", gridTemplateColumns:"minmax(96px,130px) 1fr 1fr", gap:10 }}>
             <div></div>
             <div style={{ background:C.green, color:"#fff", fontWeight:800, fontSize:12, padding:"10px 12px", borderRadius:10, textAlign:"center" }}>Unusable (missing / spoiled)</div>
@@ -1073,8 +1073,8 @@ function App(){
               <div style={{ fontSize:11.5, color:C.gray, marginTop:4, lineHeight:1.5 }}>Acknowledged and routed to the right team.</div>
             </div>
           </div>
-          <div style={{ marginTop:14 }}>
-            <Toggle title="Escalation and guardrails"><strong>Escalation and guardrails:</strong> if several supporting ingredients fail together, or two or more critical ones, the outcome escalates to a full meal credit. The full-meal tier, the expensive one, is confirmed against the supplier batch and may request a photo, so the cheap path stays frictionless while the costly path stays fraud-resistant. Flag an ingredient in <strong>My solution</strong> above to see the resulting outcome on the confirmation screen.</Toggle>
+          <div style={{ background:C.white, border:`1px solid ${C.line}`, borderRadius:14, padding:"14px 16px", marginTop:14, fontSize:13, color:C.ink, lineHeight:1.65 }}>
+            <strong>Escalation and guardrails:</strong> if several supporting ingredients fail together, or two or more critical ones, the outcome escalates to a full meal credit. The full-meal tier, the expensive one, is confirmed against the supplier batch and may request a photo, so the cheap path stays frictionless while the costly path stays fraud-resistant. Flag an ingredient in <strong>My solution</strong> above to see the resulting outcome on the confirmation screen.
           </div>
         </div>
       </div>
@@ -1136,7 +1136,7 @@ function App(){
       <div style={{ background:C.bg, padding:"8px 0 44px" }}>
         <div className="pageWrap">
           <H2>Connecting feedback to supplier performance</H2>
-          <Toggle title="About the supplier scorecard">One opportunity uncovered during this exploration was the possibility of connecting customer feedback directly to supplier performance. The scorecard below illustrates how ingredient level reports could be aggregated into supplier quality signals and used to inform operational decisions. Drag the slider to explore how a single batch could cross the threshold.</Toggle>
+          <Lead>One opportunity uncovered during this exploration was the possibility of connecting customer feedback directly to supplier performance. The scorecard below illustrates how ingredient level reports could be aggregated into supplier quality signals and used to inform operational decisions. Drag the slider to explore how a single batch could cross the threshold.</Lead>
           <OpsScorecard/>
         </div>
       </div>
@@ -1155,7 +1155,7 @@ function App(){
         <div className="pageWrap">
           <div style={{ display:"inline-block", background:"rgba(141,198,63,.2)", color:C.lime, fontWeight:800, fontSize:11, letterSpacing:.6, textTransform:"uppercase", borderRadius:20, padding:"4px 12px", marginBottom:12 }}>The business case</div>
           <h2 style={{ fontSize:22, color:"#fff", margin:"0 0 6px" }}>What it costs today, and how this could support retention</h2>
-          <Toggle title="A note on the figures" dark>Figures below are from public research; where HelloFresh does not disclose a number, the estimate and its basis are stated.</Toggle>
+          <p style={{ color:"rgba(255,255,255,.6)", fontSize:14, margin:"0 0 22px", lineHeight:1.6, maxWidth:820 }}>Figures below are from public research; where HelloFresh does not disclose a number, the estimate and its basis are stated.</p>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", columnGap:14 }}>
           <Toggle title="The cost of the current model" dark>In 95%+ of cases HelloFresh resolves issues with a discretionary account credit, with no published formula. Quality and service credits are not broken out, but on ~$8.25B revenue an estimated ~1% (<strong>~$80M+ a year</strong>) is a realistic order of magnitude, larger than 2024's near-zero / slightly negative operating margin. Most credits are absorbed, not recovered, because a complaint never reaches the supplier batch.</Toggle>
           <Toggle title="Who they are losing" dark>Public reviews cluster on three things this solution captures: <strong>quality</strong> (protein and produce freshness), <strong>delivery</strong> (late boxes, melted ice, warm meat), and <strong>damage</strong>. The signal is severe: 1.3★ on Trustpilot and 1,800+ BBB complaints in three years, led by refund denials, slow credits and unresolved issues.</Toggle>
